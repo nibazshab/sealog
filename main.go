@@ -1,12 +1,9 @@
 package main
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"strings"
 	"time"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 type (
@@ -48,25 +45,15 @@ type (
 	}
 )
 
-func cryptoPassword(password string) string {
-	salt := rand.Text()
-	h := sha256.New()
-	h.Write([]byte(password + salt))
-	hash := hex.EncodeToString(h.Sum(nil))
-
-	return fmt.Sprintf("$sha256$%s$%s", salt, hash)
+func cryptoPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
 }
 
-func verifyPassword(input, password string) bool {
-	parts := strings.Split(password, "$")
-	if len(parts) != 4 || parts[1] != "sha256" {
-		return false
-	}
-	salt, y := parts[2], parts[3]
-
-	h := sha256.New()
-	h.Write([]byte(input + salt))
-	x := hex.EncodeToString(h.Sum(nil))
-
-	return y == x
+func verifyPassword(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
