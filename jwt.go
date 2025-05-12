@@ -13,15 +13,17 @@ import (
 var jwtSecret []byte
 
 func initializeJwtSecret() {
-	var secret JwtSecret
+	var k Key
 
-	err := db.Last(&secret).Error
+	// SELECT * FROM `keys` ORDER BY `keys`.`id` DESC LIMIT 1
+	err := db.Last(&k).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			jwtSecret = generateHMACKey()
-			secret.Str = base64.RawURLEncoding.EncodeToString(jwtSecret)
+			k.Str = base64.RawURLEncoding.EncodeToString(jwtSecret)
 
-			db.Create(&secret)
+			// INSERT INTO `keys` (`str`) VALUES ("Qk7WIJ70b4Xds6S5L944pU8DmUSYxx5EXojyTRV9S7I") RETURNING `id`
+			db.Create(&k)
 		} else {
 			panic("database error: " + err.Error())
 		}
@@ -29,7 +31,7 @@ func initializeJwtSecret() {
 		return
 	}
 
-	jwtSecret, _ = base64.RawURLEncoding.DecodeString(secret.Str)
+	jwtSecret, _ = base64.RawURLEncoding.DecodeString(k.Str)
 }
 
 func generateHMACKey() []byte {

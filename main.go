@@ -3,6 +3,7 @@ package main
 import (
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -32,14 +33,14 @@ type (
 		Deep int8 `gorm:"default:1"`
 	}
 
-	// User 角色，游客和管理员, Role: 1 管理员, 0 游客
+	// User 用户
 	User struct {
-		Role     int8 `gorm:"primaryKey"`
+		Id       int `gorm:"primaryKey"`
 		Password string
 	}
 
-	// JwtSecret Jwt 密钥
-	JwtSecret struct {
+	// Key 签名密钥
+	Key struct {
 		Id  int `gorm:"primaryKey"`
 		Str string
 	}
@@ -56,4 +57,9 @@ func cryptoPassword(password string) (string, error) {
 func verifyPassword(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
+}
+
+func run() {
+	r := gin.Default()
+	r.Run(":8080")
 }
