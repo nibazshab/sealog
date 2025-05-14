@@ -37,12 +37,12 @@ func (u *User) setPassword(password string) error {
 	if err != nil {
 		return err
 	}
-	u.Password = hash
+	u.Hash = hash
 
-	// INSERT INTO `users` (`password`,`id`)
+	// INSERT INTO `users` (`hash`,`id`)
 	// VALUES ("$2a$10$zqars0w5SAkRBDPnhrBEses1lmy15hfKkGZfO21jx/mi959v3aEfq",1)
 	// ON CONFLICT (`id`)
-	// DO UPDATE SET `password`=`excluded`.`password` RETURNING `id`
+	// DO UPDATE SET `hash`=`excluded`.`hash` RETURNING `id`
 	return db.Save(u).Error
 }
 
@@ -53,7 +53,7 @@ func (u *User) login(password string) bool {
 		return false
 	}
 
-	return verifyPassword(password, u.Password)
+	return verifyPassword(password, u.Hash)
 }
 
 func cryptoPassword(password string) (string, error) {

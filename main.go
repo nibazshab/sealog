@@ -34,8 +34,8 @@ type (
 
 	// User 用户
 	User struct {
-		Id       int `gorm:"primaryKey"`
-		Password string
+		Id   int `gorm:"primaryKey"`
+		Hash string
 	}
 
 	// Key 签名密钥
