@@ -1,8 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"log"
 
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -15,7 +19,15 @@ func initializeAdminUser() {
 	err := db.First(&u).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			// 要求用户设置密码
+			b := make([]byte, 3)
+			rand.Read(b)
+			randPassword := hex.EncodeToString(b)
+
+			err = u.setPassword(randPassword)
+			if err != nil {
+				panic(err)
+			}
+			log.Println("Password:", randPassword)
 		}
 	}
 }
@@ -42,4 +54,13 @@ func (u *User) login(password string) bool {
 	}
 
 	return verifyPassword(password, u.Password)
+}
+
+func cryptoPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(hash), err
+}
+
+func verifyPassword(password, hash string) bool {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
