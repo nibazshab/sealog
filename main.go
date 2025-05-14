@@ -12,8 +12,9 @@ type (
 		Id        int       `gorm:"primaryKey"`
 		CreatedAt time.Time `gorm:"autoCreateTime"`
 		Title     string
-		Tag       int `gorm:"index"`
-		Floors    int `gorm:"default:1"`
+		Tag       int   `gorm:"index"`
+		Floors    int   `gorm:"default:1"`
+		Post      *Post `gorm:"-"`
 	}
 
 	// Post 帖子楼层

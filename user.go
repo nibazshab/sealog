@@ -28,6 +28,8 @@ func initializeAdminUser() {
 				panic(err)
 			}
 			log.Println("Password:", randPassword)
+		} else {
+			panic(err)
 		}
 	}
 }

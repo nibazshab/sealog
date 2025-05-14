@@ -22,16 +22,23 @@ func initializeJwtSecret() {
 			jwtSecret = generateHMACKey()
 			k.Str = base64.RawURLEncoding.EncodeToString(jwtSecret)
 
-			// INSERT INTO `keys` (`str`) VALUES ("Qk7WIJ70b4Xds6S5L944pU8DmUSYxx5EXojyTRV9S7I") RETURNING `id`
-			db.Create(&k)
+			err = k.addSignKey()
+			if err != nil {
+				panic(err)
+			}
 		} else {
-			panic("database error: " + err.Error())
+			panic(err)
 		}
 
 		return
 	}
 
 	jwtSecret, _ = base64.RawURLEncoding.DecodeString(k.Str)
+}
+
+func (k *Key) addSignKey() error {
+	// INSERT INTO `keys` (`str`) VALUES ("Qk7WIJ70b4Xds6S5L944pU8DmUSYxx5EXojyTRV9S7I") RETURNING `id`
+	return db.Create(k).Error
 }
 
 func generateHMACKey() []byte {
