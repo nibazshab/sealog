@@ -10,6 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// Key 签名密钥
+type Key struct {
+	Id  int `gorm:"primaryKey"`
+	Str string
+}
+
 var jwtSecret []byte
 
 func initializeJwtSecret() {

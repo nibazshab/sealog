@@ -11,38 +11,26 @@ type (
 	Topic struct {
 		Id        int       `gorm:"primaryKey"`
 		CreatedAt time.Time `gorm:"autoCreateTime"`
-		Title     string
-		Tag       int   `gorm:"index"`
-		Floors    int   `gorm:"default:1"`
-		Post      *Post `gorm:"-"`
+		Title     string    `json:"title"`
+		ModelId   int       `gorm:"index" json:"modelId"`
+		Floors    int       `gorm:"default:1"`
+		Post      *Post     `gorm:"-" json:"post"`
 	}
 
 	// Post 帖子楼层
 	Post struct {
 		Id        int `gorm:"primaryKey"`
-		TopicId   int `gorm:"index"`
+		TopicId   int `gorm:"index" json:"topic_id"`
 		Floor     int
 		UpdatedAt time.Time `gorm:"autoUpdateTime"`
-		Content   string
+		Content   string    `json:"content"`
 	}
 
-	// Tag 帖子版块, Deep: 1 游客可以查看, 2 游客不可查看, 3 游客可以发帖
-	Tag struct {
-		Id   int `gorm:"primaryKey"`
-		Name string
-		Deep int8 `gorm:"default:1"`
-	}
-
-	// User 用户
-	User struct {
-		Id   int `gorm:"primaryKey"`
-		Hash string
-	}
-
-	// Key 签名密钥
-	Key struct {
-		Id  int `gorm:"primaryKey"`
-		Str string
+	// Model 帖子版块, Deep: 1 游客可以查看, 2 游客不可查看, 3 游客可以发帖
+	Model struct {
+		Id   int    `gorm:"primaryKey" json:"id"`
+		Name string `json:"name"`
+		Deep int8   `gorm:"default:1" json:"deep"`
 	}
 )
 

@@ -10,6 +10,12 @@ import (
 	"gorm.io/gorm"
 )
 
+// User 用户
+type User struct {
+	Id   int `gorm:"primaryKey"`
+	Hash string
+}
+
 func initializeAdminUser() {
 	u := User{
 		Id: 1,

@@ -1,19 +1,37 @@
 package main
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-type response struct {
-	msg string
+type result struct {
+	code int
+	msg  string
 }
 
+func (m *Model) setModelAttribute() error {
+	// INSERT INTO `models` (`name`,`deep`) VALUES ("测试",1) RETURNING `id`
+	// UPDATE `models` SET `name`="测试",`deep`=2 WHERE `id` = 1
+	return db.Save(m).Error
+}
+
+// new topic json like
+//
+//	{
+//		"title": "test",
+//		"modelId": 1,
+//		"post": {
+//			"content": "Hello World!"
+//		}
+//	}
 func createTopic(c *gin.Context) {
 	var t Topic
 	err := c.ShouldBindJSON(&t) // 结构体需设置 json 可选条目
 	if err != nil {
-		c.JSON(400, response{
+		c.JSON(400, result{
 			msg: err.Error(),
 		})
 		return
@@ -21,13 +39,35 @@ func createTopic(c *gin.Context) {
 
 	err = t.createNewTopic()
 	if err != nil {
-		c.JSON(400, response{
+		c.JSON(400, result{
 			msg: err.Error(),
 		})
 	}
 }
 
+func (m *Model) verifyExist() error {
+	var count int64
+
+	// SELECT count(*) FROM `models` WHERE `models`.`id` = 1
+	err := db.Model(&Model{}).Where(m).Count(&count).Error
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return errors.New("model not exist")
+	}
+	return nil
+}
+
 func (t *Topic) createNewTopic() error {
+	var m Model = Model{
+		Id: t.ModelId,
+	}
+	err := m.verifyExist()
+	if err != nil {
+		return err
+	}
+
 	return db.Create(t).Error
 }
 
