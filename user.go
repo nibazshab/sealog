@@ -47,10 +47,8 @@ func (u *User) setPassword(password string) error {
 	}
 	u.Hash = hash
 
-	// INSERT INTO `users` (`hash`,`id`)
-	// VALUES ("$2a$10$zqars0w5SAkRBDPnhrBEses1lmy15hfKkGZfO21jx/mi959v3aEfq",1)
-	// ON CONFLICT (`id`)
-	// DO UPDATE SET `hash`=`excluded`.`hash` RETURNING `id`
+	// INSERT INTO `users` (`hash`,`id`) VALUES ("$2a$10$zqars0w5SAkRBDPnhrBEses1lmy15hfKkGZfO21jx/mi959v3aEfq",1)
+	// ON CONFLICT (`id`) DO UPDATE SET `hash`=`excluded`.`hash` RETURNING `id`
 	return db.Save(u).Error
 }
 

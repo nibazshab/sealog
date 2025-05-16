@@ -88,7 +88,8 @@ func (m *Model) verifyExist() error {
 }
 
 func (t *Topic) create(p *Post) error {
-	// INSERT INTO `topics` (`created_at`,`title`,`model_id`,`floors`) VALUES ("2025-05-16 00:31:07.555","test",1,1) RETURNING `id`
+	// INSERT INTO `topics` (`created_at`,`title`,`model_id`,`floors`)
+	// VALUES ("2025-05-16 00:31:07.555","test",1,1) RETURNING `id`
 	return db.Set("post", p).Create(t).Error
 }
 
@@ -113,7 +114,8 @@ func (t *Topic) AfterCreate(tx *gorm.DB) error {
 	p.TopicId = t.Id
 	p.Floor = 1
 
-	// INSERT INTO `posts` (`topic_id`,`floor`,`updated_at`,`content`) VALUES (14,1,"2025-05-16 00:31:07.555","Hello World!") RETURNING `id`
+	// INSERT INTO `posts` (`topic_id`,`floor`,`updated_at`,`content`)
+	// VALUES (14,1,"2025-05-16 00:31:07.555","Hello World!") RETURNING `id`
 	return tx.Create(p).Error
 }
 
@@ -134,7 +136,8 @@ func (p *Post) additional() error {
 	return db.Transaction(func(tx *gorm.DB) error {
 		p.Floor = t.Floors + 1
 
-		// INSERT INTO `posts` (`topic_id`,`floor`,`updated_at`,`content`) VALUES (2,8,"2025-05-16 16:37:39.254","Hello.") RETURNING `id`
+		// INSERT INTO `posts` (`topic_id`,`floor`,`updated_at`,`content`)
+		// VALUES (2,8,"2025-05-16 16:37:39.254","Hello.") RETURNING `id`
 		err = tx.Create(p).Error
 		if err != nil {
 			return err
@@ -143,4 +146,15 @@ func (p *Post) additional() error {
 		// UPDATE `topics` SET `floors`=floors + 1 WHERE `topics`.`id` = 2 AND `topics`.`floors` = 7
 		return tx.Model(&Topic{}).Where(&t).Update("floors", gorm.Expr("floors + 1")).Error
 	})
+}
+
+func (p *Post) update() error {
+	// UPDATE `posts` SET `updated_at`="2025-05-16 18:33:31.041",`content`="" WHERE topic_id = 2 AND floor = 6
+	return db.Model(p).Where("topic_id = ?", p.TopicId).Where("floor = ?", p.Floor).
+		Select("content").Updates(p).Error
+}
+
+func (p *Post) delete() error {
+	// DELETE FROM `posts` WHERE topic_id = 2 AND floor = 6
+	return db.Model(p).Where("topic_id = ?", p.TopicId).Where("floor = ?", p.Floor).Delete(p).Error
 }
