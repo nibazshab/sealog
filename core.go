@@ -46,7 +46,7 @@ func (m *Model) delete() error {
 
 func (m *Model) BeforeDelete(tx *gorm.DB) error {
 	// UPDATE `topics` SET `model_id`=0 WHERE model_id = 1
-	return tx.Model(&Topic{}).Where("model_id = ?", m.Id).Update("model_id", 0).Error
+	return tx.Model(&Topic{}).Where("model_id = ?", m.Id).UpdateColumn("model_id", 0).Error
 }
 
 func (m *Model) update(new *Model) error {
@@ -70,7 +70,7 @@ func (m *Model) BeforeUpdate(tx *gorm.DB) error {
 	}
 
 	// UPDATE `topics` SET `model_id`=11 WHERE model_id = 1
-	return tx.Model(&Topic{}).Where("model_id = ?", m.Id).Update("model_id", n).Error
+	return tx.Model(&Topic{}).Where("model_id = ?", m.Id).UpdateColumn("model_id", n).Error
 }
 
 func (m *Model) verifyExist() error {
@@ -119,9 +119,45 @@ func (t *Topic) AfterCreate(tx *gorm.DB) error {
 	return tx.Create(p).Error
 }
 
+func (t *Topic) delete() error {
+	// DELETE FROM `topics` WHERE `topics`.`id` = 2
+	return db.Delete(t).Error
+}
+
+func (t *Topic) BeforeDelete(tx *gorm.DB) error {
+	// DELETE FROM `posts` WHERE topic_id = 2
+	return tx.Model(&Post{}).Where("topic_id = ?", t.Id).Delete(&Post{}).Error
+}
+
+func (t *Topic) update(new *Topic) error {
+	// UPDATE `topics` SET `title`="test2",`model_id`=2 WHERE `id` = 2
+	return db.Set("newModelId", new.ModelId).Model(t).Updates(new).Error
+}
+
+func (t *Topic) BeforeUpdate(tx *gorm.DB) error {
+	if !tx.Statement.Changed("model_id") {
+		return nil
+	}
+
+	newModelId, ok := tx.Get("newModelId")
+	if !ok {
+		return errors.New("no model id")
+	}
+
+	n, ok := newModelId.(int)
+	if !ok {
+		return errors.New("not model id")
+	}
+
+	m := Model{
+		Id: n,
+	}
+	return m.verifyExist()
+}
+
 func (t *Topic) countFloor() error {
 	// SELECT `floors` FROM `topics` WHERE `topics`.`id` = 2 ORDER BY `topics`.`id` LIMIT 1
-	return db.Model(&Topic{}).Select("floors").First(t).Error
+	return db.Select("floors").First(t).Error
 }
 
 func (p *Post) additional() error {
@@ -144,17 +180,17 @@ func (p *Post) additional() error {
 		}
 
 		// UPDATE `topics` SET `floors`=floors + 1 WHERE `topics`.`id` = 2 AND `topics`.`floors` = 7
-		return tx.Model(&Topic{}).Where(&t).Update("floors", gorm.Expr("floors + 1")).Error
+		return tx.Model(&Topic{}).Where(&t).UpdateColumn("floors", gorm.Expr("floors + 1")).Error
 	})
+}
+
+func (p *Post) delete() error {
+	// DELETE FROM `posts` WHERE topic_id = 2 AND floor = 6
+	return db.Model(p).Where("topic_id = ?", p.TopicId).Where("floor = ?", p.Floor).Delete(p).Error
 }
 
 func (p *Post) update() error {
 	// UPDATE `posts` SET `updated_at`="2025-05-16 18:33:31.041",`content`="" WHERE topic_id = 2 AND floor = 6
 	return db.Model(p).Where("topic_id = ?", p.TopicId).Where("floor = ?", p.Floor).
 		Select("content").Updates(p).Error
-}
-
-func (p *Post) delete() error {
-	// DELETE FROM `posts` WHERE topic_id = 2 AND floor = 6
-	return db.Model(p).Where("topic_id = ?", p.TopicId).Where("floor = ?", p.Floor).Delete(p).Error
 }
