@@ -169,7 +169,7 @@ func (t *Topic) BeforeDelete(tx *gorm.DB) error {
 //	}
 func (t *Topic) update(new *Topic) error {
 	// UPDATE `topics` SET `title`="test2",`model_id`=2 WHERE `id` = 2
-	return db.Set("newModelId", new.ModelId).Model(t).Updates(new).Error
+	return db.Set("newModelId", new.ModelId).Model(t).Omit("id", "floors").Updates(new).Error
 }
 
 func (t *Topic) BeforeUpdate(tx *gorm.DB) error {
