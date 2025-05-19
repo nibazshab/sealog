@@ -21,8 +21,7 @@ func initializeAdminUser() {
 		Id: 1,
 	}
 
-	// SELECT * FROM `users` WHERE `users`.`id` = 1 ORDER BY `users`.`id` LIMIT 1
-	err := db.First(&u).Error
+	err := u.getPassword()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			b := make([]byte, 3)
@@ -38,6 +37,11 @@ func initializeAdminUser() {
 			panic(err)
 		}
 	}
+}
+
+func (u *User) getPassword() error {
+	// SELECT * FROM `users` WHERE `users`.`id` = 1 ORDER BY `users`.`id` LIMIT 1
+	return db.First(u).Error
 }
 
 func (u *User) setPassword(password string) error {

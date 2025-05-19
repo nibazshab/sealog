@@ -21,8 +21,7 @@ var jwtSecret []byte
 func initializeJwtSecret() {
 	var k Key
 
-	// SELECT * FROM `keys` ORDER BY `keys`.`id` DESC LIMIT 1
-	err := db.Last(&k).Error
+	err := k.getSignKey()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			jwtSecret = generateHMACKey()
@@ -40,6 +39,11 @@ func initializeJwtSecret() {
 	}
 
 	jwtSecret, _ = base64.RawURLEncoding.DecodeString(k.Str)
+}
+
+func (k *Key) getSignKey() error {
+	// SELECT * FROM `keys` ORDER BY `keys`.`id` DESC LIMIT 1
+	return db.Last(k).Error
 }
 
 func (k *Key) addSignKey() error {
