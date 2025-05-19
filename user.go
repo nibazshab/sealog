@@ -30,11 +30,11 @@ func initializeAdminUser() {
 
 			err = u.setPassword(randPassword)
 			if err != nil {
-				panic(err)
+				log.Fatalln("error:", err)
 			}
-			log.Println("Password:", randPassword)
+			log.Println("default password:", randPassword)
 		} else {
-			panic(err)
+			log.Fatalln("error:", err)
 		}
 	}
 }

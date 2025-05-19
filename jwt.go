@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -29,10 +30,10 @@ func initializeJwtSecret() {
 
 			err = k.addSignKey()
 			if err != nil {
-				panic(err)
+				log.Fatalln("error:", err)
 			}
 		} else {
-			panic(err)
+			log.Fatalln("error:", err)
 		}
 
 		return
