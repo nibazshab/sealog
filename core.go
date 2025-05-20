@@ -18,18 +18,18 @@ type (
 	// Topic 帖子主题
 	Topic struct {
 		Id        int       `gorm:"primaryKey"      json:"id"`
-		CreatedAt time.Time `gorm:"autoCreateTime"`
+		CreatedAt time.Time `gorm:"autoCreateTime"  json:"created_at"`
 		Title     string    `gorm:"not null"        json:"title"`
 		ModelId   int       `gorm:"index;default:0" json:"model_id"`
-		Floors    int       `gorm:"default:1"`
+		Floors    int       `gorm:"default:1"       json:"-"`
 	}
 
 	// Post 帖子楼层
 	Post struct {
-		Id        int       `gorm:"primaryKey"`
+		Id        int       `gorm:"primaryKey"     json:"-"`
 		TopicId   int       `gorm:"index;not null" json:"topic_id"`
 		Floor     int       `gorm:"index;not null" json:"floor"`
-		UpdatedAt time.Time `gorm:"autoUpdateTime"`
+		UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
 		Content   string    `gorm:"not null"       json:"content"`
 	}
 )
@@ -39,7 +39,7 @@ type (
 //		Deep: 0,
 //	}
 func (m *Model) create() error {
-	// INSERT INTO `models` (`name`,`deep`) VALUES ("测试",1) RETURNING `id`
+	// INSERT INTO `models` (`name`,`deep`) VALUES ("guest",3) RETURNING `id`
 	return db.Create(m).Error
 }
 
