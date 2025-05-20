@@ -25,18 +25,14 @@ func initializeJwtSecret() {
 	err := k.getSignKey()
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			jwtSecret = generateHMACKey()
-			k.Str = base64.RawURLEncoding.EncodeToString(jwtSecret)
-
 			err = k.addSignKey()
 			if err != nil {
 				log.Fatalln("error:", err)
 			}
+			return
 		} else {
 			log.Fatalln("error:", err)
 		}
-
-		return
 	}
 
 	jwtSecret, _ = base64.RawURLEncoding.DecodeString(k.Str)
@@ -48,6 +44,9 @@ func (k *Key) getSignKey() error {
 }
 
 func (k *Key) addSignKey() error {
+	jwtSecret = generateHMACKey()
+	k.Str = base64.RawURLEncoding.EncodeToString(jwtSecret)
+
 	// INSERT INTO `keys` (`str`) VALUES ("Qk7WIJ70b4Xds6S5L944pU8DmUSYxx5EXojyTRV9S7I") RETURNING `id`
 	return db.Create(k).Error
 }

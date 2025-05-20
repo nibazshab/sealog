@@ -25,6 +25,32 @@ type recvTopicBody struct {
 //		"content": "Hello World!"
 //	}
 
+func setPassword(c *gin.Context) {
+	type payload struct {
+		Password string `json:"password"`
+	}
+	var p payload
+	err := c.ShouldBindJSON(&p)
+	if err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+
+	u := User{
+		Id: 1,
+	}
+	err = u.setPassword(p.Password)
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+	c.JSON(200, result[any]{
+		Code: 200,
+		Msg:  "reset password success",
+		Data: nil,
+	})
+}
+
 func login(c *gin.Context) {
 	type payload struct {
 		Password string `json:"password"`
@@ -67,10 +93,10 @@ func authMiddleware() gin.HandlerFunc {
 		token := c.Request.Header.Get("Authorization")
 
 		ok := decodeToken(token)
-		if !ok {
-			c.Set("id", 0)
-		} else {
+		if ok {
 			c.Set("id", 1)
+		} else {
+			c.Set("id", 0)
 		}
 
 		c.Next()
