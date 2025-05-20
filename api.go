@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"errors"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +18,91 @@ type resource struct {
 	Posts []*Post `json:"posts"`
 }
 
-func newDiscussion(c *gin.Context) {
+func createCategory(c *gin.Context) {
+	type payload struct {
+		Name string `json:"name" binding:"required"`
+		Deep int8   `json:"deep" binding:"required"`
+	}
+	var p payload
+	if err := c.ShouldBindJSON(&p); err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+
+	var model = Model{
+		Name: p.Name,
+		Deep: p.Deep,
+	}
+	var err = model.create()
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	c.JSON(200, result[Model]{
+		Code: 0,
+		Msg:  "create category success",
+		Data: model,
+	})
+}
+
+func createComment(c *gin.Context) {
+	type payload struct {
+		TopicId int    `json:"topic_id" binding:"required"`
+		Content string `json:"content"  binding:"required"`
+	}
+	var p payload
+	if err := c.ShouldBindJSON(&p); err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+
+	var post = Post{
+		TopicId: p.TopicId,
+		Content: p.Content,
+	}
+	var err = post.additional()
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	c.JSON(200, result[Post]{
+		Code: 0,
+		Msg:  "create comment success",
+		Data: post,
+	})
+}
+
+func updateComment(c *gin.Context) {
+	type payload struct {
+		TopicId int    `json:"topic_id" binding:"required"`
+		Floor   int    `json:"floor"    binding:"required"`
+		Content string `json:"content"  binding:"required"`
+	}
+	var p payload
+	if err := c.ShouldBindJSON(&p); err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+	var post = Post{
+		TopicId: p.TopicId,
+		Floor:   p.Floor,
+		Content: p.Content,
+	}
+	var err = post.update()
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+	c.JSON(200, result[Post]{
+		Code: 0,
+		Msg:  "update comment success",
+		Data: post,
+	})
+}
+
+func createDiscussion(c *gin.Context) {
 	type payload struct {
 		Title   string `json:"title"    binding:"required"`
 		ModelId int    `json:"model_id" binding:"required"`
@@ -26,7 +110,6 @@ func newDiscussion(c *gin.Context) {
 	}
 	var p payload
 	if err := c.ShouldBindJSON(&p); err != nil {
-		fmt.Println(p)
 		responseError(c, err, 400, "payload error")
 		return
 	}
@@ -40,7 +123,7 @@ func newDiscussion(c *gin.Context) {
 	}
 	err := topic.create(&post)
 	if err != nil {
-		responseError(c, err, 500, "new discussion error")
+		responseError(c, err, 500, "server error")
 		return
 	}
 
@@ -50,8 +133,45 @@ func newDiscussion(c *gin.Context) {
 	}
 	c.JSON(200, result[resource]{
 		Code: 200,
-		Msg:  "new discussion success",
+		Msg:  "create discussion success",
 		Data: r,
+	})
+}
+
+func updateDiscussion(c *gin.Context) {
+	type payload struct {
+		Id      int    `json:"id" binding:"required"`
+		Title   string `json:"title"`
+		ModelId int    `json:"model_id"`
+	}
+	var p payload
+	if err := c.ShouldBindJSON(&p); err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+
+	if p.Title == "" && p.ModelId == 0 {
+		responseError(c, errors.New("missing value"), 400, "payload error")
+		return
+	}
+
+	var topic = Topic{
+		Id: p.Id,
+	}
+	var newTopic = Topic{
+		Title:   p.Title,
+		ModelId: p.ModelId,
+	}
+	var err = topic.update(&newTopic)
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	c.JSON(200, result[Topic]{
+		Code: 200,
+		Msg:  "update discussion success",
+		Data: newTopic,
 	})
 }
 
@@ -80,7 +200,7 @@ func changeUserPassword(c *gin.Context) {
 	}
 	c.JSON(200, result[any]{
 		Code: 200,
-		Msg:  "reset password success",
+		Msg:  "change user password success",
 		Data: nil,
 	})
 }
