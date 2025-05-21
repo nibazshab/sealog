@@ -29,76 +29,78 @@ func createCategory(c *gin.Context) {
 		return
 	}
 
-	var model = Model{
+	model := Model{
 		Name: p.Name,
 		Deep: p.Deep,
 	}
-	var err = model.create()
+	err := model.create()
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
 	c.JSON(200, result[Model]{
-		Code: 0,
+		Code: 200,
 		Msg:  "create category success",
 		Data: model,
 	})
 }
 
-func createComment(c *gin.Context) {
+func updateCategory(c *gin.Context) {
 	type payload struct {
-		TopicId int    `json:"topic_id" binding:"required"`
-		Content string `json:"content"  binding:"required"`
+		Id   int    `json:"id" binding:"required"`
+		Name string `json:"name"`
+		Deep int8   `json:"deep"`
 	}
 	var p payload
 	if err := c.ShouldBindJSON(&p); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
 	}
-
-	var post = Post{
-		TopicId: p.TopicId,
-		Content: p.Content,
+	if p.Name == "" && p.Deep == 0 {
+		responseError(c, errors.New("missing value"), 400, "payload error")
+		return
 	}
-	var err = post.additional()
+	model := Model{
+		Id: p.Id,
+	}
+	newModel := Model{
+		Name: p.Name,
+		Deep: p.Deep,
+	}
+	err := model.update(&newModel)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
-
-	c.JSON(200, result[Post]{
-		Code: 0,
-		Msg:  "create comment success",
-		Data: post,
+	c.JSON(200, result[any]{
+		Code: 200,
+		Msg:  "update category success",
+		Data: nil,
 	})
 }
 
-func updateComment(c *gin.Context) {
+func deleteCategory(c *gin.Context) {
 	type payload struct {
-		TopicId int    `json:"topic_id" binding:"required"`
-		Floor   int    `json:"floor"    binding:"required"`
-		Content string `json:"content"  binding:"required"`
+		Id int `json:"id" binding:"required"`
 	}
 	var p payload
 	if err := c.ShouldBindJSON(&p); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
 	}
-	var post = Post{
-		TopicId: p.TopicId,
-		Floor:   p.Floor,
-		Content: p.Content,
+	model := Model{
+		Id: p.Id,
 	}
-	var err = post.update()
+	err := model.delete()
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
-	c.JSON(200, result[Post]{
-		Code: 0,
-		Msg:  "update comment success",
-		Data: post,
+	c.JSON(200, result[any]{
+		Code: 200,
+		Msg:  "delete category success",
+		Data: nil,
 	})
 }
 
@@ -155,23 +157,129 @@ func updateDiscussion(c *gin.Context) {
 		return
 	}
 
-	var topic = Topic{
+	topic := Topic{
 		Id: p.Id,
 	}
-	var newTopic = Topic{
+	newTopic := Topic{
 		Title:   p.Title,
 		ModelId: p.ModelId,
 	}
-	var err = topic.update(&newTopic)
+	err := topic.update(&newTopic)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
-	c.JSON(200, result[Topic]{
+	c.JSON(200, result[any]{
 		Code: 200,
 		Msg:  "update discussion success",
-		Data: newTopic,
+		Data: nil,
+	})
+}
+
+func deleteDiscussion(c *gin.Context) {
+	type payload struct {
+		Id int `json:"id" binding:"required"`
+	}
+	var p payload
+	if err := c.ShouldBindJSON(&p); err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+	topic := Topic{
+		Id: p.Id,
+	}
+	err := topic.delete()
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+	c.JSON(200, result[any]{
+		Code: 200,
+		Msg:  "delete discussion success",
+		Data: nil,
+	})
+}
+
+func createComment(c *gin.Context) {
+	type payload struct {
+		TopicId int    `json:"topic_id" binding:"required"`
+		Content string `json:"content"  binding:"required"`
+	}
+	var p payload
+	if err := c.ShouldBindJSON(&p); err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+
+	post := Post{
+		TopicId: p.TopicId,
+		Content: p.Content,
+	}
+	err := post.additional()
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	c.JSON(200, result[Post]{
+		Code: 200,
+		Msg:  "create comment success",
+		Data: post,
+	})
+}
+
+func updateComment(c *gin.Context) {
+	type payload struct {
+		TopicId int    `json:"topic_id" binding:"required"`
+		Floor   int    `json:"floor"    binding:"required"`
+		Content string `json:"content"  binding:"required"`
+	}
+	var p payload
+	if err := c.ShouldBindJSON(&p); err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+	post := Post{
+		TopicId: p.TopicId,
+		Floor:   p.Floor,
+		Content: p.Content,
+	}
+	err := post.update()
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+	c.JSON(200, result[Post]{
+		Code: 200,
+		Msg:  "update comment success",
+		Data: post,
+	})
+}
+
+func deleteComment(c *gin.Context) {
+	type payload struct {
+		TopicId int `json:"topic_id" binding:"required"`
+		Floor   int `json:"floor"    binding:"required"`
+	}
+	var p payload
+	if err := c.ShouldBindJSON(&p); err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+	post := Post{
+		TopicId: p.TopicId,
+		Floor:   p.Floor,
+	}
+	err := post.delete()
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+	c.JSON(200, result[any]{
+		Code: 200,
+		Msg:  "delete comment success",
+		Data: nil,
 	})
 }
 
