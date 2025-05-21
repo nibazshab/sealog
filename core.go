@@ -205,7 +205,7 @@ func (t *Topic) countFloor() error {
 //		TopicId:   0,
 //		Content:   "",
 //	}
-func (p *Post) additional() error {
+func (p *Post) create() error {
 	t := Topic{
 		Id: p.TopicId,
 	}
@@ -241,10 +241,13 @@ func (p *Post) delete() error {
 //	var p = Post{
 //		TopicId:   0,
 //		Floor:     0,
+//	}
+//
+//	var p = Post{
 //		Content:   "",
 //	}
-func (p *Post) update() error {
+func (p *Post) update(new *Post) error {
 	// UPDATE `posts` SET `updated_at`="2025-05-16 18:33:31.041",`content`="" WHERE topic_id = 2 AND floor = 6
 	return db.Model(p).Where("topic_id = ?", p.TopicId).Where("floor = ?", p.Floor).
-		Select("content").Updates(p).Error
+		Select("content").Updates(new).Error
 }

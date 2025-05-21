@@ -33,17 +33,7 @@ func createCategory(c *gin.Context) {
 		Name: p.Name,
 		Deep: p.Deep,
 	}
-	err := model.create()
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-
-	c.JSON(200, result[Model]{
-		Code: 200,
-		Msg:  "create category success",
-		Data: model,
-	})
+	publicCreate(c, &model)
 }
 
 func updateCategory(c *gin.Context) {
@@ -57,10 +47,12 @@ func updateCategory(c *gin.Context) {
 		responseError(c, err, 400, "payload error")
 		return
 	}
+
 	if p.Name == "" && p.Deep == 0 {
 		responseError(c, errors.New("missing value"), 400, "payload error")
 		return
 	}
+
 	model := Model{
 		Id: p.Id,
 	}
@@ -68,16 +60,7 @@ func updateCategory(c *gin.Context) {
 		Name: p.Name,
 		Deep: p.Deep,
 	}
-	err := model.update(&newModel)
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-	c.JSON(200, result[any]{
-		Code: 200,
-		Msg:  "update category success",
-		Data: nil,
-	})
+	publicUpdate(c, &model, &newModel)
 }
 
 func deleteCategory(c *gin.Context) {
@@ -89,19 +72,11 @@ func deleteCategory(c *gin.Context) {
 		responseError(c, err, 400, "payload error")
 		return
 	}
+
 	model := Model{
 		Id: p.Id,
 	}
-	err := model.delete()
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-	c.JSON(200, result[any]{
-		Code: 200,
-		Msg:  "delete category success",
-		Data: nil,
-	})
+	publicDelete(c, &model)
 }
 
 func createDiscussion(c *gin.Context) {
@@ -135,7 +110,7 @@ func createDiscussion(c *gin.Context) {
 	}
 	c.JSON(200, result[resource]{
 		Code: 200,
-		Msg:  "create discussion success",
+		Msg:  "create success",
 		Data: r,
 	})
 }
@@ -164,17 +139,7 @@ func updateDiscussion(c *gin.Context) {
 		Title:   p.Title,
 		ModelId: p.ModelId,
 	}
-	err := topic.update(&newTopic)
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-
-	c.JSON(200, result[any]{
-		Code: 200,
-		Msg:  "update discussion success",
-		Data: nil,
-	})
+	publicUpdate(c, &topic, &newTopic)
 }
 
 func deleteDiscussion(c *gin.Context) {
@@ -186,19 +151,11 @@ func deleteDiscussion(c *gin.Context) {
 		responseError(c, err, 400, "payload error")
 		return
 	}
+
 	topic := Topic{
 		Id: p.Id,
 	}
-	err := topic.delete()
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-	c.JSON(200, result[any]{
-		Code: 200,
-		Msg:  "delete discussion success",
-		Data: nil,
-	})
+	publicDelete(c, &topic)
 }
 
 func createComment(c *gin.Context) {
@@ -216,17 +173,7 @@ func createComment(c *gin.Context) {
 		TopicId: p.TopicId,
 		Content: p.Content,
 	}
-	err := post.additional()
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-
-	c.JSON(200, result[Post]{
-		Code: 200,
-		Msg:  "create comment success",
-		Data: post,
-	})
+	publicCreate(c, &post)
 }
 
 func updateComment(c *gin.Context) {
@@ -240,21 +187,15 @@ func updateComment(c *gin.Context) {
 		responseError(c, err, 400, "payload error")
 		return
 	}
+
 	post := Post{
 		TopicId: p.TopicId,
 		Floor:   p.Floor,
+	}
+	newPost := Post{
 		Content: p.Content,
 	}
-	err := post.update()
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-	c.JSON(200, result[Post]{
-		Code: 200,
-		Msg:  "update comment success",
-		Data: post,
-	})
+	publicUpdate(c, &post, &newPost)
 }
 
 func deleteComment(c *gin.Context) {
@@ -267,20 +208,12 @@ func deleteComment(c *gin.Context) {
 		responseError(c, err, 400, "payload error")
 		return
 	}
+
 	post := Post{
 		TopicId: p.TopicId,
 		Floor:   p.Floor,
 	}
-	err := post.delete()
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-	c.JSON(200, result[any]{
-		Code: 200,
-		Msg:  "delete comment success",
-		Data: nil,
-	})
+	publicDelete(c, &post)
 }
 
 func list() {
@@ -353,14 +286,12 @@ func userLogin(c *gin.Context) {
 func authMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Request.Header.Get("Authorization")
-
 		ok := decodeToken(token)
 		if ok {
 			c.Set("id", 1)
 		} else {
 			c.Set("id", 0)
 		}
-
 		c.Next()
 	}
 }
@@ -371,6 +302,64 @@ func responseError(c *gin.Context, err error, code int, msg string) {
 	c.JSON(200, result[any]{
 		Code: code,
 		Msg:  msg,
+		Data: nil,
+	})
+}
+
+type coreTypes interface {
+	*Model | *Topic | *Post
+}
+
+type coreCreate interface {
+	create() error
+}
+
+type coreUpdate[T coreTypes] interface {
+	update(T) error
+}
+
+type coreDelete interface {
+	delete() error
+}
+
+func publicCreate(c *gin.Context, obj coreCreate) {
+	err := obj.create()
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	c.JSON(200, result[coreCreate]{
+		Code: 200,
+		Msg:  "create success",
+		Data: obj,
+	})
+}
+
+func publicUpdate[T coreTypes](c *gin.Context, obj coreUpdate[T], new T) {
+	err := obj.update(new)
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	c.JSON(200, result[coreUpdate[T]]{
+		Code: 200,
+		Msg:  "update success",
+		Data: obj,
+	})
+}
+
+func publicDelete(c *gin.Context, obj coreDelete) {
+	err := obj.delete()
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	c.JSON(200, result[any]{
+		Code: 200,
+		Msg:  "delete success",
 		Data: nil,
 	})
 }
