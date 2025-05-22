@@ -8,7 +8,7 @@ import (
 )
 
 type (
-	// Model 帖子版块, Deep: 1 游客可以查看, 2 游客不可查看, 3 游客可以发帖
+	// Model 帖子版块, Deep: 1 普通, 2 隐藏, 3 公开
 	Model struct {
 		Id   int    `gorm:"primaryKey" json:"id"`
 		Name string `gorm:"not null"   json:"name"`

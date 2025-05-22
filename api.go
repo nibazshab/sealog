@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"log"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -16,6 +17,61 @@ type result[T any] struct {
 type resource struct {
 	Topic *Topic  `json:"topic"`
 	Posts []*Post `json:"posts"`
+}
+
+type (
+	coreTypes interface {
+		*Model | *Topic | *Post
+	}
+
+	coreCreate interface {
+		create() error
+	}
+
+	coreUpdate[T coreTypes] interface {
+		update(T) error
+	}
+
+	coreDelete interface {
+		delete() error
+	}
+)
+
+func getDiscussions(c *gin.Context) {
+	// url get: discussions?offset=20/40/60...
+	// 分页加载，登录状态决定是否归属显示 model.deep = 2  的隐藏帖子
+
+	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if err != nil || offset < 0 {
+		offset = 0
+	}
+
+	var topics []Topic
+	err = db.Order("id DESC").Offset(offset).Limit(21).Find(&topics).Error
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	var message string
+	end := len(topics) <= 20
+	if end {
+		message = "fin"
+	} else {
+		topics = topics[:20]
+		message = "to be continue"
+	}
+
+	c.JSON(200, result[*[]Topic]{
+		Code: 200,
+		Msg:  message,
+		Data: &topics,
+	})
+}
+
+func responseList(c *gin.Context, conds ...interface{}) {
+	// 初次打开网页时的初始化返回应当包括：
+	// []model, []topic, user 信息
 }
 
 func createCategory(c *gin.Context) {
@@ -216,10 +272,6 @@ func deleteComment(c *gin.Context) {
 	publicDelete(c, &post)
 }
 
-func list() {
-	// 分页加载，登录状态决定是否归属显示 model.deep = 2  的隐藏帖子
-}
-
 func changeUserPassword(c *gin.Context) {
 	type payload struct {
 		Password string `json:"password" binding:"required"`
@@ -296,6 +348,21 @@ func authMiddleware() gin.HandlerFunc {
 	}
 }
 
+func protectMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.MustGet("id").(int)
+		if id == 0 {
+			c.AbortWithStatusJSON(200, result[any]{
+				Code: 403,
+				Msg:  "access denied",
+				Data: nil,
+			})
+			return
+		}
+		c.Next()
+	}
+}
+
 func responseError(c *gin.Context, err error, code int, msg string) {
 	log.Println("error:", err)
 
@@ -304,22 +371,6 @@ func responseError(c *gin.Context, err error, code int, msg string) {
 		Msg:  msg,
 		Data: nil,
 	})
-}
-
-type coreTypes interface {
-	*Model | *Topic | *Post
-}
-
-type coreCreate interface {
-	create() error
-}
-
-type coreUpdate[T coreTypes] interface {
-	update(T) error
-}
-
-type coreDelete interface {
-	delete() error
 }
 
 func publicCreate(c *gin.Context, obj coreCreate) {
