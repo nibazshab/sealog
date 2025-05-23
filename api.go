@@ -37,14 +37,46 @@ type (
 	}
 )
 
+func getUserInformation(c *gin.Context) {
+	id := c.MustGet("id").(int)
+
+	c.JSON(200, result[int]{
+		Code: 200,
+		Msg:  "get user information success",
+		Data: id,
+	})
+}
+
+func getCategories(c *gin.Context) {
+	id := c.MustGet("id").(int)
+
+	// SELECT * FROM `models` WHERE deep <> 2
+	// SELECT * FROM `models`
+	query := db
+	if id == 0 {
+		query = query.Where("deep <> ?", 2)
+	}
+	var models []Model
+	err := query.Find(&models).Error
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	c.JSON(200, result[*[]Model]{
+		Code: 200,
+		Msg:  "get categories success",
+		Data: &models,
+	})
+}
+
 func getDiscussions(c *gin.Context) {
+	id := c.MustGet("id").(int)
+
 	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	if err != nil || offset < 0 {
 		offset = 0
 	}
-
-	id := c.MustGet("id").(int)
-	var topics []Topic
 
 	// SELECT * FROM `topics` WHERE model_id NOT IN (SELECT `id` FROM `models` WHERE deep = 2) ORDER BY id DESC LIMIT 21
 	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
@@ -53,6 +85,7 @@ func getDiscussions(c *gin.Context) {
 		subQuery := db.Model(&Model{}).Select("id").Where("deep = ?", 2)
 		query = query.Where("model_id NOT IN (?)", subQuery)
 	}
+	var topics []Topic
 	err = query.Find(&topics).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
