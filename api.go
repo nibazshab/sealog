@@ -38,16 +38,22 @@ type (
 )
 
 func getDiscussions(c *gin.Context) {
-	// url get: discussions?offset=20/40/60...
-	// 分页加载，登录状态决定是否归属显示 model.deep = 2  的隐藏帖子
-
 	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
 	if err != nil || offset < 0 {
 		offset = 0
 	}
 
+	id := c.MustGet("id").(int)
 	var topics []Topic
-	err = db.Order("id DESC").Offset(offset).Limit(21).Find(&topics).Error
+
+	// SELECT * FROM `topics` WHERE model_id NOT IN (SELECT `id` FROM `models` WHERE deep = 2) ORDER BY id DESC LIMIT 21
+	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
+	query := db.Order("id DESC").Offset(offset).Limit(21)
+	if id == 0 {
+		subQuery := db.Model(&Model{}).Select("id").Where("deep = ?", 2)
+		query = query.Where("model_id NOT IN (?)", subQuery)
+	}
+	err = query.Find(&topics).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
