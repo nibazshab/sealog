@@ -156,7 +156,7 @@ func (p *Post) create(interface{}) error {
 	topic := Topic{
 		Id: p.TopicId,
 	}
-	num, err := topic.countFloor()
+	num, err := topic.queryFloors()
 	if err != nil {
 		return err
 	}
@@ -212,8 +212,16 @@ func (m *Model) verifyExist() error {
 	return nil
 }
 
+func (m *Model) queryDeep() (int, error) {
+	var num int
+
+	// SELECT `deep` FROM `models` WHERE `models`.`id` = 2 ORDER BY `models`.`id` LIMIT 1
+	err := db.Select("deep").First(m).Scan(&num).Error
+	return num, err
+}
+
 // t.Id
-func (t *Topic) countFloor() (int, error) {
+func (t *Topic) queryFloors() (int, error) {
 	var num int
 
 	// SELECT `floors` FROM `topics` WHERE `topics`.`id` = 2 ORDER BY `topics`.`id` LIMIT 1

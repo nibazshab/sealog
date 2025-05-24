@@ -135,7 +135,12 @@ func getDiscussions(c *gin.Context) {
 	}
 
 	if id == 0 {
-		if urlquery.Category != 0 && model.Deep == 2 {
+		deep, err := model.queryDeep()
+		if err != nil {
+			responseError(c, err, 500, "server error")
+			return
+		}
+		if urlquery.Category != 0 && deep == 2 {
 			responseError(c, errors.New("access denied"), 404, "not found")
 			return
 		}
