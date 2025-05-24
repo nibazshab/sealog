@@ -39,11 +39,15 @@ func getDiscussion(c *gin.Context) {
 	}
 
 	// SELECT topics.*, models.deep FROM `topics` LEFT JOIN models ON topics.model_id = models.id WHERE topics.id = 4
-	err = db.Table("topics").Select("topics.*, models.deep").
+	rs := db.Table("topics").Select("topics.*, models.deep").
 		Joins("LEFT JOIN models ON topics.model_id = models.id").
-		Where("topics.id = ?", tid).Scan(&data).Error
-	if err != nil {
+		Where("topics.id = ?", tid).Scan(&data)
+	if rs.Error != nil {
 		responseError(c, err, 500, "server error")
+		return
+	}
+	if rs.RowsAffected == 0 {
+		responseError(c, errors.New("not found"), 404, "not found")
 		return
 	}
 
@@ -107,31 +111,26 @@ func getCategories(c *gin.Context) {
 	})
 }
 
-func getDiscussions(c *gin.Context) {
+func getDiscussionsByCategory(c *gin.Context) {
 	id := c.MustGet("id").(int)
-	var urlquery struct {
-		Offset   int `form:"offset" binding:"min=0"`
-		Category int `form:"category"`
+	mid, err := strconv.Atoi(c.Param("mid"))
+	if err != nil || mid <= 0 {
+		responseError(c, err, 404, "not found")
+		return
 	}
-	if err := c.ShouldBindQuery(&urlquery); err != nil {
+	var urlquery struct {
+		Offset int `form:"offset" binding:"min=0"`
+	}
+	if err = c.ShouldBindQuery(&urlquery); err != nil {
 		urlquery.Offset = 0
 	}
 
-	var model Model
-	var topics []Topic
-
-	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
-	query := db.Order("id DESC").Offset(urlquery.Offset).Limit(21)
-
-	if urlquery.Category != 0 {
-		model.Id = urlquery.Category
-		if err := model.verifyExist(); err != nil {
-			responseError(c, err, 404, "not found")
-			return
-		}
-
-		// SELECT * FROM `topics` WHERE model_id = 2 ORDER BY id DESC LIMIT 21
-		query.Where("model_id = ?", urlquery.Category)
+	model := Model{
+		Id: mid,
+	}
+	if err = model.verifyExist(); err != nil {
+		responseError(c, err, 404, "not found")
+		return
 	}
 
 	if id == 0 {
@@ -140,19 +139,56 @@ func getDiscussions(c *gin.Context) {
 			responseError(c, err, 500, "server error")
 			return
 		}
-		if urlquery.Category != 0 && deep == 2 {
+		if deep == 2 {
 			responseError(c, errors.New("access denied"), 404, "not found")
 			return
 		}
+	}
 
+	var topics []Topic
+
+	// SELECT * FROM `topics` WHERE model_id = 1 ORDER BY id DESC LIMIT 21
+	err = db.Order("id DESC").Offset(urlquery.Offset).Limit(21).
+		Where("model_id = ?", mid).Find(&topics).Error
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	var msg string
+	if len(topics) <= 20 {
+		msg = "fin"
+	} else {
+		topics = topics[:20]
+		msg = "to be continue"
+	}
+
+	c.JSON(200, result[*[]Topic]{
+		Code: 200,
+		Msg:  msg,
+		Data: &topics,
+	})
+}
+
+func getDiscussions(c *gin.Context) {
+	id := c.MustGet("id").(int)
+	var urlquery struct {
+		Offset int `form:"offset" binding:"min=0"`
+	}
+	if err := c.ShouldBindQuery(&urlquery); err != nil {
+		urlquery.Offset = 0
+	}
+
+	var topics []Topic
+
+	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
+	query := db.Order("id DESC").Offset(urlquery.Offset).Limit(21)
+	if id == 0 {
 		// SELECT * FROM `topics` WHERE model_id NOT IN (SELECT `id` FROM `models` WHERE deep = 2)
 		// AND model_id <> 0 ORDER BY id DESC LIMIT 21
 		subQuery := db.Model(&Model{}).Select("id").Where("deep = ?", 2)
 		query = query.Where("model_id NOT IN (?)", subQuery).Where("model_id <> 0")
 	}
-
-	// SELECT * FROM `topics` WHERE model_id = 2
-	// AND model_id NOT IN (SELECT `id` FROM `models` WHERE deep = 2) AND model_id <> 0 ORDER BY id DESC LIMIT 21
 	err := query.Find(&topics).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")

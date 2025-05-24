@@ -48,8 +48,8 @@ func (m *Model) delete() error {
 
 func (m *Model) BeforeDelete(tx *gorm.DB) error {
 	// UPDATE `topics` SET `model_id`=0 WHERE model_id = 1
-	return tx.Session(&gorm.Session{SkipHooks: true}).
-		Model(&Topic{}).Where("model_id = ?", m.Id).Update("model_id", 0).Error
+	return tx.Model(&Topic{}).Session(&gorm.Session{SkipHooks: true}).
+		Where("model_id = ?", m.Id).Update("model_id", 0).Error
 }
 
 // m.Id
@@ -67,16 +67,16 @@ func (m *Model) BeforeUpdate(tx *gorm.DB) error {
 
 	data, ok := tx.Get("data")
 	if !ok {
-		return errors.New("no newId")
+		return errors.New("no data")
 	}
 	model, ok := data.(*Model)
 	if !ok {
-		return errors.New("not newId")
+		return errors.New("not model")
 	}
 
 	// UPDATE `topics` SET `model_id`=11 WHERE model_id = 1
-	return tx.Session(&gorm.Session{SkipHooks: true}).
-		Model(&Topic{}).Where("model_id = ?", m.Id).Update("model_id", model.Id).Error
+	return tx.Model(&Topic{}).Session(&gorm.Session{SkipHooks: true}).
+		Where("model_id = ?", m.Id).Update("model_id", model.Id).Error
 }
 
 // t.Title, t.ModelId
@@ -97,7 +97,7 @@ func (t *Topic) BeforeCreate(*gorm.DB) error {
 func (t *Topic) AfterCreate(tx *gorm.DB) error {
 	data, ok := tx.Get("data")
 	if !ok {
-		return errors.New("no post")
+		return errors.New("no data")
 	}
 	post, ok := data.(*Post)
 	if !ok {
@@ -108,7 +108,7 @@ func (t *Topic) AfterCreate(tx *gorm.DB) error {
 	post.Floor = 1
 
 	// INSERT INTO `posts` (`topic_id`,`floor`,`updated_at`,`content`) VALUES (14,1,"2025-05-16 00:31:07.555","Hello World!") RETURNING `id`
-	return tx.Session(&gorm.Session{SkipHooks: true}).
+	return tx.Model(&Post{}).Session(&gorm.Session{SkipHooks: true}).
 		Create(post).Error
 }
 
@@ -171,16 +171,16 @@ func (p *Post) create(interface{}) error {
 func (p *Post) AfterCreate(tx *gorm.DB) error {
 	data, ok := tx.Get("data")
 	if !ok {
-		return errors.New("no")
+		return errors.New("no data")
 	}
 	topic, ok := data.(*Topic)
 	if !ok {
-		return errors.New("not")
+		return errors.New("not topic")
 	}
 
 	// UPDATE `topics` SET `floors`=floors + 1 WHERE `topics`.`id` = 2 AND `topics`.`floors` = 7
-	return tx.Session(&gorm.Session{SkipHooks: true}).
-		Model(&Topic{}).Where(topic).Update("floors", gorm.Expr("floors + 1")).Error
+	return tx.Model(&Topic{}).Session(&gorm.Session{SkipHooks: true}).
+		Where(topic).Update("floors", gorm.Expr("floors + 1")).Error
 }
 
 // p.TopicId, p.Floor
