@@ -19,28 +19,16 @@ type resource struct {
 	Posts []*Post `json:"posts"`
 }
 
-type (
-	coreTypes interface {
-		*Model | *Topic | *Post
-	}
-
-	coreCreate interface {
-		create() error
-	}
-
-	coreUpdate[T coreTypes] interface {
-		update(T) error
-	}
-
-	coreDelete interface {
-		delete() error
-	}
-)
+type core interface {
+	create(interface{}) error
+	update(interface{}) error
+	delete() error
+}
 
 func getDiscussion(c *gin.Context) {
 	id := c.MustGet("id").(int)
 	tid, err := strconv.Atoi(c.Param("tid"))
-	if err != nil {
+	if err != nil || tid <= 0 {
 		responseError(c, err, 404, "not found")
 		return
 	}
@@ -98,14 +86,14 @@ func getUserInformation(c *gin.Context) {
 func getCategories(c *gin.Context) {
 	id := c.MustGet("id").(int)
 
-	// SELECT * FROM `models` WHERE deep <> 2
-	//
+	var models []Model
+
 	// SELECT * FROM `models`
 	query := db
 	if id == 0 {
+		// SELECT * FROM `models` WHERE deep <> 2
 		query = query.Where("deep <> ?", 2)
 	}
-	var models []Model
 	err := query.Find(&models).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
@@ -121,46 +109,64 @@ func getCategories(c *gin.Context) {
 
 func getDiscussions(c *gin.Context) {
 	id := c.MustGet("id").(int)
-	offset, err := strconv.Atoi(c.DefaultQuery("offset", "0"))
-	if err != nil || offset < 0 {
-		offset = 0
+	var urlquery struct {
+		Offset   int `form:"offset" binding:"min=0"`
+		Category int `form:"category"`
+	}
+	if err := c.ShouldBindQuery(&urlquery); err != nil {
+		urlquery.Offset = 0
 	}
 
-	// SELECT * FROM `topics` WHERE model_id NOT IN (SELECT `id` FROM `models` WHERE deep = 2)
-	// AND model_id <> 0 ORDER BY id DESC LIMIT 21
-	//
+	var model Model
+	var topics []Topic
+
 	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
-	query := db.Order("id DESC").Offset(offset).Limit(21)
+	query := db.Order("id DESC").Offset(urlquery.Offset).Limit(21)
+
+	if urlquery.Category != 0 {
+		model.Id = urlquery.Category
+		if err := model.verifyExist(); err != nil {
+			responseError(c, err, 404, "not found")
+			return
+		}
+
+		// SELECT * FROM `topics` WHERE model_id = 2 ORDER BY id DESC LIMIT 21
+		query.Where("model_id = ?", urlquery.Category)
+	}
+
 	if id == 0 {
+		if urlquery.Category != 0 && model.Deep == 2 {
+			responseError(c, errors.New("access denied"), 404, "not found")
+			return
+		}
+
+		// SELECT * FROM `topics` WHERE model_id NOT IN (SELECT `id` FROM `models` WHERE deep = 2)
+		// AND model_id <> 0 ORDER BY id DESC LIMIT 21
 		subQuery := db.Model(&Model{}).Select("id").Where("deep = ?", 2)
 		query = query.Where("model_id NOT IN (?)", subQuery).Where("model_id <> 0")
 	}
-	var topics []Topic
-	err = query.Find(&topics).Error
+
+	// SELECT * FROM `topics` WHERE model_id = 2
+	// AND model_id NOT IN (SELECT `id` FROM `models` WHERE deep = 2) AND model_id <> 0 ORDER BY id DESC LIMIT 21
+	err := query.Find(&topics).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
-	var message string
-	end := len(topics) <= 20
-	if end {
-		message = "fin"
+	var msg string
+	if len(topics) <= 20 {
+		msg = "fin"
 	} else {
 		topics = topics[:20]
-		message = "to be continue"
+		msg = "to be continue"
 	}
 
 	c.JSON(200, result[*[]Topic]{
 		Code: 200,
-		Msg:  message,
+		Msg:  msg,
 		Data: &topics,
 	})
-}
-
-func responseList(c *gin.Context, conds ...interface{}) {
-	// 初次打开网页时的初始化返回应当包括：
-	// []model, []topic, user 信息
 }
 
 func createCategory(c *gin.Context) {
@@ -186,7 +192,6 @@ func updateCategory(c *gin.Context) {
 		Name string `json:"name"`
 		Deep int8   `json:"deep"`
 	}
-
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
@@ -211,7 +216,6 @@ func deleteCategory(c *gin.Context) {
 	var payload struct {
 		Id int `json:"id" binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
@@ -229,7 +233,6 @@ func createDiscussion(c *gin.Context) {
 		ModelId int    `json:"model_id" binding:"required"`
 		Content string `json:"content"  binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
@@ -242,21 +245,11 @@ func createDiscussion(c *gin.Context) {
 	post := Post{
 		Content: payload.Content,
 	}
-	err := topic.create(&post)
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-
 	r := resource{
 		Topic: &topic,
 		Posts: []*Post{&post},
 	}
-	c.JSON(200, result[resource]{
-		Code: 200,
-		Msg:  "create success",
-		Data: r,
-	})
+	publicCreate(c, &topic, &post, r)
 }
 
 func updateDiscussion(c *gin.Context) {
@@ -265,7 +258,6 @@ func updateDiscussion(c *gin.Context) {
 		Title   string `json:"title"`
 		ModelId int    `json:"model_id"`
 	}
-
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
@@ -290,7 +282,6 @@ func deleteDiscussion(c *gin.Context) {
 	var payload struct {
 		Id int `json:"id" binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
@@ -307,7 +298,6 @@ func createComment(c *gin.Context) {
 		TopicId int    `json:"topic_id" binding:"required"`
 		Content string `json:"content"  binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
@@ -326,7 +316,6 @@ func updateComment(c *gin.Context) {
 		Floor   int    `json:"floor"    binding:"required"`
 		Content string `json:"content"  binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
@@ -347,7 +336,6 @@ func deleteComment(c *gin.Context) {
 		TopicId int `json:"topic_id" binding:"required"`
 		Floor   int `json:"floor"    binding:"required"`
 	}
-
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
@@ -360,11 +348,10 @@ func deleteComment(c *gin.Context) {
 	publicDelete(c, &post)
 }
 
-func changeUserPassword(c *gin.Context) {
+func userChangePassword(c *gin.Context) {
 	var payload struct {
 		Password string `json:"password" binding:"required"`
 	}
-
 	err := c.ShouldBindJSON(&payload)
 	if err != nil {
 		responseError(c, err, 400, "payload error")
@@ -381,7 +368,7 @@ func changeUserPassword(c *gin.Context) {
 	}
 	c.JSON(200, result[any]{
 		Code: 200,
-		Msg:  "change user password success",
+		Msg:  "change password success",
 		Data: nil,
 	})
 }
@@ -390,7 +377,6 @@ func userLogin(c *gin.Context) {
 	var payload struct {
 		Password string `json:"password" binding:"required"`
 	}
-
 	err := c.ShouldBindJSON(&payload)
 	if err != nil {
 		responseError(c, err, 400, "payload error")
@@ -418,7 +404,7 @@ func userLogin(c *gin.Context) {
 	}
 	c.JSON(200, result[string]{
 		Code: 200,
-		Msg:  "token",
+		Msg:  "login success",
 		Data: token,
 	})
 }
@@ -461,35 +447,45 @@ func responseError(c *gin.Context, err error, code int, msg string) {
 	})
 }
 
-func publicCreate(c *gin.Context, obj coreCreate) {
-	err := obj.create()
+func publicCreate(c *gin.Context, obj core, conds ...interface{}) {
+	var data any
+	var r any
+
+	if conds != nil && len(conds) == 2 {
+		data = conds[0]
+		r = conds[1]
+	} else {
+		r = obj
+	}
+
+	err := obj.create(data)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
-	c.JSON(200, result[coreCreate]{
+	c.JSON(200, result[any]{
 		Code: 200,
 		Msg:  "create success",
-		Data: obj,
+		Data: r,
 	})
 }
 
-func publicUpdate[T coreTypes](c *gin.Context, obj coreUpdate[T], new T) {
-	err := obj.update(new)
+func publicUpdate(c *gin.Context, obj core, data interface{}) {
+	err := obj.update(data)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
-	c.JSON(200, result[coreUpdate[T]]{
+	c.JSON(200, result[core]{
 		Code: 200,
 		Msg:  "update success",
 		Data: obj,
 	})
 }
 
-func publicDelete(c *gin.Context, obj coreDelete) {
+func publicDelete(c *gin.Context, obj core) {
 	err := obj.delete()
 	if err != nil {
 		responseError(c, err, 500, "server error")
