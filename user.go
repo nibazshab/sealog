@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"log"
 
 	"golang.org/x/crypto/bcrypt"
@@ -36,17 +35,12 @@ func initializeAdminUser() {
 	}
 }
 
-func resetAdminPassword() {
+func resetAdminPassword() (string, error) {
 	u := User{
 		Id: 1,
 	}
 
-	password, err := u.randPassword()
-	if err != nil {
-		fmt.Println("error:", err)
-		return
-	}
-	fmt.Println("new password:", password)
+	return u.randPassword()
 }
 
 func (u *User) randPassword() (string, error) {
