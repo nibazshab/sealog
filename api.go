@@ -38,9 +38,9 @@ func getDiscussion(c *gin.Context) {
 		Deep int
 	}
 
-	// SELECT topics.*, models.deep FROM `topics` LEFT JOIN models ON topics.model_id = models.id WHERE topics.id = 4
-	rs := db.Table("topics").Select("topics.*, models.deep").
-		Joins("LEFT JOIN models ON topics.model_id = models.id").
+	// SELECT topics.*, modes.deep FROM `topics` LEFT JOIN modes ON topics.mode_id = modes.id WHERE topics.id = 4
+	rs := db.Table("topics").Select("topics.*, modes.deep").
+		Joins("LEFT JOIN modes ON topics.mode_id = modes.id").
 		Where("topics.id = ?", tid).Scan(&data)
 	if rs.Error != nil {
 		responseError(c, err, 500, "server error")
@@ -51,7 +51,7 @@ func getDiscussion(c *gin.Context) {
 		return
 	}
 
-	if id == 0 && (data.Deep == 2 || data.Topic.ModelId == 0) {
+	if id == 0 && (data.Deep == 2 || data.Topic.ModeId == 0) {
 		responseError(c, errors.New("access denied"), 404, "not found")
 		return
 	}
@@ -90,24 +90,24 @@ func getUserInformation(c *gin.Context) {
 func getCategories(c *gin.Context) {
 	id := c.MustGet("id").(int)
 
-	var models []Model
+	var modes []Mode
 
-	// SELECT * FROM `models`
+	// SELECT * FROM `modes`
 	query := db
 	if id == 0 {
-		// SELECT * FROM `models` WHERE deep <> 2
+		// SELECT * FROM `modes` WHERE deep <> 2
 		query = query.Where("deep <> ?", 2)
 	}
-	err := query.Find(&models).Error
+	err := query.Find(&modes).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
-	c.JSON(200, result[*[]Model]{
+	c.JSON(200, result[*[]Mode]{
 		Code: 200,
 		Msg:  "get categories success",
-		Data: &models,
+		Data: &modes,
 	})
 }
 
@@ -125,16 +125,16 @@ func getDiscussionsByCategory(c *gin.Context) {
 		urlquery.Offset = 0
 	}
 
-	model := Model{
+	mode := Mode{
 		Id: mid,
 	}
-	if err = model.verifyExist(); err != nil {
+	if err = mode.verifyExist(); err != nil {
 		responseError(c, err, 404, "not found")
 		return
 	}
 
 	if id == 0 {
-		deep, err := model.queryDeep()
+		deep, err := mode.queryDeep()
 		if err != nil {
 			responseError(c, err, 500, "server error")
 			return
@@ -147,9 +147,9 @@ func getDiscussionsByCategory(c *gin.Context) {
 
 	var topics []Topic
 
-	// SELECT * FROM `topics` WHERE model_id = 1 ORDER BY id DESC LIMIT 21
+	// SELECT * FROM `topics` WHERE mode_id = 1 ORDER BY id DESC LIMIT 21
 	err = db.Order("id DESC").Offset(urlquery.Offset).Limit(21).
-		Where("model_id = ?", mid).Find(&topics).Error
+		Where("mode_id = ?", mid).Find(&topics).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
@@ -184,10 +184,10 @@ func getDiscussions(c *gin.Context) {
 	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
 	query := db.Order("id DESC").Offset(urlquery.Offset).Limit(21)
 	if id == 0 {
-		// SELECT * FROM `topics` WHERE model_id NOT IN (SELECT `id` FROM `models` WHERE deep = 2)
-		// AND model_id <> 0 ORDER BY id DESC LIMIT 21
-		subQuery := db.Model(&Model{}).Select("id").Where("deep = ?", 2)
-		query = query.Where("model_id NOT IN (?)", subQuery).Where("model_id <> 0")
+		// SELECT * FROM `topics` WHERE mode_id NOT IN (SELECT `id` FROM `modes` WHERE deep = 2)
+		// AND mode_id <> 0 ORDER BY id DESC LIMIT 21
+		subQuery := db.Model(&Mode{}).Select("id").Where("deep = ?", 2)
+		query = query.Where("mode_id NOT IN (?)", subQuery).Where("mode_id <> 0")
 	}
 	err := query.Find(&topics).Error
 	if err != nil {
@@ -220,11 +220,11 @@ func createCategory(c *gin.Context) {
 		return
 	}
 
-	model := Model{
+	mode := Mode{
 		Name: payload.Name,
 		Deep: payload.Deep,
 	}
-	publicCreate(c, &model)
+	publicCreate(c, &mode)
 }
 
 func updateCategory(c *gin.Context) {
@@ -243,14 +243,14 @@ func updateCategory(c *gin.Context) {
 		return
 	}
 
-	model := Model{
+	mode := Mode{
 		Id: payload.Id,
 	}
-	newModel := Model{
+	newMode := Mode{
 		Name: payload.Name,
 		Deep: payload.Deep,
 	}
-	publicUpdate(c, &model, &newModel)
+	publicUpdate(c, &mode, &newMode)
 }
 
 func deleteCategory(c *gin.Context) {
@@ -262,16 +262,16 @@ func deleteCategory(c *gin.Context) {
 		return
 	}
 
-	model := Model{
+	mode := Mode{
 		Id: payload.Id,
 	}
-	publicDelete(c, &model)
+	publicDelete(c, &mode)
 }
 
 func createDiscussion(c *gin.Context) {
 	var payload struct {
 		Title   string `json:"title"    binding:"required"`
-		ModelId int    `json:"model_id" binding:"required"`
+		ModeId  int    `json:"mode_id" binding:"required"`
 		Content string `json:"content"  binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
@@ -280,8 +280,8 @@ func createDiscussion(c *gin.Context) {
 	}
 
 	topic := Topic{
-		Title:   payload.Title,
-		ModelId: payload.ModelId,
+		Title:  payload.Title,
+		ModeId: payload.ModeId,
 	}
 	post := Post{
 		Content: payload.Content,
@@ -295,16 +295,16 @@ func createDiscussion(c *gin.Context) {
 
 func updateDiscussion(c *gin.Context) {
 	var payload struct {
-		Id      int    `json:"id" binding:"required"`
-		Title   string `json:"title"`
-		ModelId int    `json:"model_id"`
+		Id     int    `json:"id" binding:"required"`
+		Title  string `json:"title"`
+		ModeId int    `json:"mode_id"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
 	}
 
-	if payload.Title == "" && payload.ModelId == 0 {
+	if payload.Title == "" && payload.ModeId == 0 {
 		responseError(c, errors.New("missing value"), 400, "payload error")
 		return
 	}
@@ -313,8 +313,8 @@ func updateDiscussion(c *gin.Context) {
 		Id: payload.Id,
 	}
 	newTopic := Topic{
-		Title:   payload.Title,
-		ModelId: payload.ModelId,
+		Title:  payload.Title,
+		ModeId: payload.ModeId,
 	}
 	publicUpdate(c, &topic, &newTopic)
 }

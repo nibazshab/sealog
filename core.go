@@ -8,8 +8,8 @@ import (
 )
 
 type (
-	// Model 帖子版块
-	Model struct {
+	// Mode 帖子版块
+	Mode struct {
 		Id   int    `gorm:"primaryKey" json:"id"`
 		Name string `gorm:"not null"   json:"name"`
 		Deep int8   `gorm:"default:1"  json:"deep"` // 1 普通, 2 隐藏, 3 公开
@@ -20,7 +20,7 @@ type (
 		Id        int       `gorm:"primaryKey"      json:"id"`
 		CreatedAt time.Time `gorm:"autoCreateTime"  json:"created_at"`
 		Title     string    `gorm:"not null"        json:"title"`
-		ModelId   int       `gorm:"index;default:0" json:"model_id"`
+		ModeId    int       `gorm:"index;default:0" json:"mode_id"`
 		Floors    int       `gorm:"default:1"       json:"-"`
 	}
 
@@ -35,32 +35,32 @@ type (
 )
 
 // m.Name, m.Deep
-func (m *Model) create(interface{}) error {
-	// INSERT INTO `models` (`name`,`deep`) VALUES ("guest",3) RETURNING `id`
+func (m *Mode) create(interface{}) error {
+	// INSERT INTO `modes` (`name`,`deep`) VALUES ("guest",3) RETURNING `id`
 	return db.Create(m).Error
 }
 
 // m.Id
-func (m *Model) delete() error {
-	// DELETE FROM `models` WHERE `models`.`id` = 1
+func (m *Mode) delete() error {
+	// DELETE FROM `modes` WHERE `modes`.`id` = 1
 	return db.Delete(m).Error
 }
 
-func (m *Model) BeforeDelete(tx *gorm.DB) error {
-	// UPDATE `topics` SET `model_id`=0 WHERE model_id = 1
+func (m *Mode) BeforeDelete(tx *gorm.DB) error {
+	// UPDATE `topics` SET `mode_id`=0 WHERE mode_id = 1
 	return tx.Model(&Topic{}).Session(&gorm.Session{SkipHooks: true}).
-		Where("model_id = ?", m.Id).Update("model_id", 0).Error
+		Where("mode_id = ?", m.Id).Update("mode_id", 0).Error
 }
 
 // m.Id
 // m.Id, m.Name, m.Deep
-func (m *Model) update(data interface{}) error {
-	// UPDATE `models` SET `id`=11,`name`="dd" WHERE `id` = 1
+func (m *Mode) update(data interface{}) error {
+	// UPDATE `modes` SET `id`=11,`name`="dd" WHERE `id` = 1
 	return db.Set("data", data).
 		Model(m).Updates(data).Error
 }
 
-func (m *Model) BeforeUpdate(tx *gorm.DB) error {
+func (m *Mode) BeforeUpdate(tx *gorm.DB) error {
 	if !tx.Statement.Changed("id") {
 		return nil
 	}
@@ -69,29 +69,29 @@ func (m *Model) BeforeUpdate(tx *gorm.DB) error {
 	if !ok {
 		return errors.New("no data")
 	}
-	model, ok := data.(*Model)
+	mode, ok := data.(*Mode)
 	if !ok {
-		return errors.New("not model")
+		return errors.New("not mode")
 	}
 
-	// UPDATE `topics` SET `model_id`=11 WHERE model_id = 1
+	// UPDATE `topics` SET `mode_id`=11 WHERE mode_id = 1
 	return tx.Model(&Topic{}).Session(&gorm.Session{SkipHooks: true}).
-		Where("model_id = ?", m.Id).Update("model_id", model.Id).Error
+		Where("mode_id = ?", m.Id).Update("mode_id", mode.Id).Error
 }
 
-// t.Title, t.ModelId
+// t.Title, t.ModeId
 // p.Content
 func (t *Topic) create(data interface{}) error {
-	// INSERT INTO `topics` (`created_at`,`title`,`model_id`,`floors`) VALUES ("2025-05-16 00:31:07.555","test",1,1) RETURNING `id`
+	// INSERT INTO `topics` (`created_at`,`title`,`mode_id`,`floors`) VALUES ("2025-05-16 00:31:07.555","test",1,1) RETURNING `id`
 	return db.Set("data", data).
 		Create(t).Error
 }
 
 func (t *Topic) BeforeCreate(*gorm.DB) error {
-	model := Model{
-		Id: t.ModelId,
+	mode := Mode{
+		Id: t.ModeId,
 	}
-	return model.verifyExist()
+	return mode.verifyExist()
 }
 
 func (t *Topic) AfterCreate(tx *gorm.DB) error {
@@ -124,15 +124,15 @@ func (t *Topic) BeforeDelete(tx *gorm.DB) error {
 }
 
 // t.Id
-// t.Title, t.ModelId
+// t.Title, t.ModeId
 func (t *Topic) update(data interface{}) error {
-	// UPDATE `topics` SET `title`="test2",`model_id`=2 WHERE `id` = 2
+	// UPDATE `topics` SET `title`="test2",`mode_id`=2 WHERE `id` = 2
 	return db.Set("data", data).
 		Model(t).Omit("id", "floors").Updates(data).Error
 }
 
 func (t *Topic) BeforeUpdate(tx *gorm.DB) error {
-	if !tx.Statement.Changed("model_id") {
+	if !tx.Statement.Changed("mode_id") {
 		return nil
 	}
 
@@ -145,10 +145,10 @@ func (t *Topic) BeforeUpdate(tx *gorm.DB) error {
 		return errors.New("not topic")
 	}
 
-	model := Model{
-		Id: topic.ModelId,
+	mode := Mode{
+		Id: topic.ModeId,
 	}
-	return model.verifyExist()
+	return mode.verifyExist()
 }
 
 // p.TopicId, p.Content
@@ -198,25 +198,25 @@ func (p *Post) update(data interface{}) error {
 }
 
 // m.Id
-func (m *Model) verifyExist() error {
+func (m *Mode) verifyExist() error {
 	var count int64
 
-	// SELECT count(*) FROM `models` WHERE `models`.`id` = 1
+	// SELECT count(*) FROM `modes` WHERE `modes`.`id` = 1
 	err := db.Model(m).Where(m).Count(&count).Error
 	if err != nil {
 		return err
 	}
 	if count == 0 {
-		return errors.New("model not exist")
+		return errors.New("mode not exist")
 	}
 	return nil
 }
 
 // m.Id
-func (m *Model) queryDeep() (int, error) {
+func (m *Mode) queryDeep() (int, error) {
 	var num int
 
-	// SELECT `deep` FROM `models` WHERE `models`.`id` = 2 ORDER BY `models`.`id` LIMIT 1
+	// SELECT `deep` FROM `modes` WHERE `modes`.`id` = 2 ORDER BY `modes`.`id` LIMIT 1
 	err := db.Select("deep").First(m).Scan(&num).Error
 	return num, err
 }

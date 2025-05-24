@@ -40,7 +40,7 @@ func run(cfg *config) {
 	gin.DefaultWriter = cfg.w
 
 	r := gin.Default()
-	r.GET()
+	// r.GET()
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.port,
