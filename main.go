@@ -13,7 +13,9 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,7 +27,7 @@ type config struct {
 }
 
 func main() {
-	cfg := initializeConfig()
+	cfg := initializeApplication()
 	initializeDbDrive(cfg)
 	initializeLogDrive(cfg)
 	run(cfg)
@@ -40,6 +42,8 @@ func run(cfg *config) {
 	gin.DefaultWriter = cfg.w
 
 	r := gin.Default()
+	r.Use(corsMiddleware())
+
 	// r.GET()
 
 	srv := &http.Server{
@@ -61,7 +65,7 @@ func run(cfg *config) {
 	closeDb()
 }
 
-func initializeConfig() *config {
+func initializeApplication() *config {
 	repw := flag.Bool("reset-password", false, "reset admin password")
 	port := flag.Int("p", 8080, "server port")
 
@@ -86,7 +90,11 @@ func initializeConfig() *config {
 	fi, err := os.Stat(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			os.MkdirAll(dir, 0o755)
+			err = os.MkdirAll(dir, 0o755)
+			if err != nil {
+				fmt.Println("error:", err)
+				os.Exit(1)
+			}
 		} else {
 			fmt.Println("error:", err)
 			os.Exit(1)
@@ -103,4 +111,14 @@ func initializeConfig() *config {
 		database: filepath.Join(dir, "data.db"),
 		log:      filepath.Join(dir, "log.log"),
 	}
+}
+
+func corsMiddleware() gin.HandlerFunc {
+	return cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"*"},
+		AllowHeaders:     []string{"*"},
+		AllowCredentials: false,
+		MaxAge:           12 * time.Hour,
+	})
 }
