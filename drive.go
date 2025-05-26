@@ -4,6 +4,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -15,7 +16,7 @@ var db *gorm.DB
 func initializeDbDrive(cfg *config) {
 	var err error
 	db, err = gorm.Open(
-		sqlite.Open(cfg.database+"?_journal=WAL&_vacuum=incremental"),
+		sqlite.Open(filepath.Join(cfg.rootfs, "data.db")+"?_journal=WAL&_vacuum=incremental"),
 		&gorm.Config{
 			TranslateError: true,
 			Logger:         logger.Default.LogMode(logger.Silent),
@@ -44,7 +45,7 @@ func closeDb() {
 }
 
 func initializeLogDrive(cfg *config) {
-	file, err := os.OpenFile(cfg.log, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	file, err := os.OpenFile(filepath.Join(cfg.rootfs, "log.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Fatalln("error:", err)
 	}

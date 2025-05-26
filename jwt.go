@@ -35,7 +35,10 @@ func initializeJwtSecret() {
 		}
 	}
 
-	jwtSecret, _ = base64.RawURLEncoding.DecodeString(k.Str)
+	jwtSecret, err = base64.RawURLEncoding.DecodeString(k.Str)
+	if err != nil {
+		log.Fatalln("error:", err)
+	}
 }
 
 func (k *Key) getSignKey() error {
@@ -53,7 +56,10 @@ func (k *Key) addSignKey() error {
 
 func generateHMACKey() []byte {
 	key := make([]byte, 32)
-	rand.Read(key)
+	_, err := rand.Read(key)
+	if err != nil {
+		log.Fatalln("error:", err)
+	}
 
 	return key
 }

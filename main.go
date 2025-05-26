@@ -19,75 +19,32 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const defaultPort = 8080
+
 type config struct {
-	port     string
-	database string
-	log      string
-	w        io.Writer
+	port   string
+	rootfs string
+	w      io.Writer
 }
 
 func main() {
 	cfg := initializeApplication()
+	argsExecute(cfg)
 	initializeDbDrive(cfg)
 	initializeLogDrive(cfg)
-	run(cfg)
-}
-
-func run(cfg *config) {
-	initializeAdminUser()
-	initializeJwtSecret()
-
-	gin.SetMode(gin.ReleaseMode)
-	gin.DisableConsoleColor()
-	gin.DefaultWriter = cfg.w
-
-	r := gin.Default()
-	r.Use(corsMiddleware())
-
-	// r.GET()
-
-	srv := &http.Server{
-		Addr:    ":" + cfg.port,
-		Handler: r,
-	}
-
-	log.Println("Listening on " + cfg.port)
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalln("error:", err)
-		}
-	}()
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-
-	closeDb()
+	serverRun(cfg)
 }
 
 func initializeApplication() *config {
-	repw := flag.Bool("reset-password", false, "reset admin password")
-	port := flag.Int("p", 8080, "server port")
-
-	flag.Parse()
-
-	if *repw {
-		pw, err := resetAdminPassword()
-		if err != nil {
-			fmt.Println("error:", err)
-			os.Exit(1)
-		}
-		fmt.Println("new password:", pw)
-		os.Exit(0)
+	ex, err := os.Executable()
+	if err != nil {
+		fmt.Println("error:", err)
+		os.Exit(1)
 	}
 
-	if *port < 1 || *port > 65535 {
-		fmt.Println("error:", "invalid port")
-	}
-
-	ex, _ := os.Executable()
 	dir := filepath.Join(filepath.Dir(ex), "data")
-	fi, err := os.Stat(dir)
+
+	info, err := os.Stat(dir)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			err = os.MkdirAll(dir, 0o755)
@@ -100,17 +57,99 @@ func initializeApplication() *config {
 			os.Exit(1)
 		}
 	} else {
-		if !fi.IsDir() {
+		if !info.IsDir() {
 			fmt.Println("error:", dir+" not a directory")
 			os.Exit(1)
 		}
 	}
 
 	return &config{
-		port:     strconv.Itoa(*port),
-		database: filepath.Join(dir, "data.db"),
-		log:      filepath.Join(dir, "log.log"),
+		port:   strconv.Itoa(defaultPort),
+		rootfs: dir,
 	}
+}
+
+func argsExecute(cfg *config) {
+	if len(os.Args) < 2 {
+		fmt.Println(man)
+		os.Exit(0)
+	}
+
+	switch os.Args[1] {
+	case "server":
+		args := flag.NewFlagSet("server", flag.ExitOnError)
+		var port int
+
+		args.IntVar(&port, "p", defaultPort, "server port")
+
+		err := args.Parse(os.Args[2:])
+		if err != nil {
+			fmt.Println("error:", err)
+			os.Exit(1)
+		}
+
+		if port < 1 || port > 65535 {
+			fmt.Println("error:", "invalid port")
+			os.Exit(1)
+		}
+
+		cfg.port = strconv.Itoa(port)
+
+	case "reset-password":
+		initializeDbDrive(cfg)
+		rawPassword, err := resetAdminPassword()
+		if err != nil {
+			fmt.Println("error:", err)
+			os.Exit(1)
+		}
+
+		fmt.Println("new password:", rawPassword)
+		closeDb()
+		os.Exit(0)
+
+	case "-h", "--help":
+		fmt.Println(man)
+		os.Exit(0)
+
+	default:
+		fmt.Println("unknown", os.Args[1])
+		os.Exit(0)
+	}
+}
+
+func serverRun(cfg *config) {
+	initializeAdminUser()
+	initializeJwtSecret()
+
+	gin.SetMode(gin.ReleaseMode)
+	gin.DisableConsoleColor()
+	gin.DefaultWriter = cfg.w
+
+	r := gin.Default()
+	initializeRouter(r)
+
+	srv := &http.Server{
+		Addr:    ":" + cfg.port,
+		Handler: r,
+	}
+
+	go func() {
+		log.Println("Listening on " + cfg.port)
+
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalln("error:", err)
+		}
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	closeDb()
+}
+
+func initializeRouter(r *gin.Engine) {
+	r.Use(corsMiddleware())
 }
 
 func corsMiddleware() gin.HandlerFunc {
@@ -122,3 +161,7 @@ func corsMiddleware() gin.HandlerFunc {
 		MaxAge:           12 * time.Hour,
 	})
 }
+
+const man = `available command:
+  server          start httpserver
+  reset-password  reset admin password`

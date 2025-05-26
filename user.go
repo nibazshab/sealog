@@ -45,9 +45,12 @@ func resetAdminPassword() (string, error) {
 
 func (u *User) randPassword() (string, error) {
 	b := make([]byte, 3)
-	rand.Read(b)
-	str := hex.EncodeToString(b)
+	_, err := rand.Read(b)
+	if err != nil {
+		log.Fatalln("error:", err)
+	}
 
+	str := hex.EncodeToString(b)
 	return str, u.setPassword(str)
 }
 
