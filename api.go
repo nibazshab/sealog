@@ -27,7 +27,7 @@ type core interface {
 
 func getDiscussion(c *gin.Context) {
 	id := c.MustGet("id").(int)
-	tid, err := strconv.Atoi(c.Param("tid"))
+	tid, err := strconv.Atoi(c.Param("pid"))
 	if err != nil || tid <= 0 {
 		responseError(c, err, 404, "not found")
 		return
@@ -113,7 +113,7 @@ func getCategories(c *gin.Context) {
 
 func getDiscussionsByCategory(c *gin.Context) {
 	id := c.MustGet("id").(int)
-	mid, err := strconv.Atoi(c.Param("mid"))
+	mid, err := strconv.Atoi(c.Param("tid"))
 	if err != nil || mid <= 0 {
 		responseError(c, err, 404, "not found")
 		return

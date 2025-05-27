@@ -150,6 +150,40 @@ func serverRun(cfg *config) {
 
 func initializeRouter(r *gin.Engine) {
 	r.Use(corsMiddleware())
+	r.Use(authMiddleware())
+
+	p := r.Group("/p")
+	p.GET("/", getDiscussions)
+	p.GET("/:pid", getDiscussion)
+
+	t := r.Group("/t")
+	t.GET("/", getCategories)
+	t.GET("/:tid", getDiscussionsByCategory)
+
+	u := r.Group("/u")
+	u.GET("/me", getUserInformation)
+
+	api := r.Group("/api")
+	api.Use(protectMiddleware())
+
+	user := api.Group("/user")
+	user.POST("/login", userLogin)
+	user.POST("/update", userChangePassword)
+
+	category := api.Group("/category")
+	category.POST("/create", createCategory)
+	category.POST("/update", updateCategory)
+	category.POST("/delete", deleteCategory)
+
+	discussion := api.Group("/discussion")
+	discussion.POST("/create", createDiscussion)
+	discussion.POST("/update", updateDiscussion)
+	discussion.POST("/delete", deleteDiscussion)
+
+	comment := api.Group("/comment")
+	comment.POST("/create", createComment)
+	comment.POST("/update", updateComment)
+	comment.POST("/delete", deleteComment)
 }
 
 func corsMiddleware() gin.HandlerFunc {
