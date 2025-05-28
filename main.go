@@ -134,7 +134,7 @@ func serverRun(cfg *config) {
 	}
 
 	go func() {
-		log.Println("Listening on " + cfg.port)
+		fmt.Println("Listening on " + cfg.port)
 
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalln("error:", err)
@@ -152,16 +152,16 @@ func initializeRouter(r *gin.Engine) {
 	r.Use(corsMiddleware())
 	r.Use(authMiddleware())
 
-	p := r.Group("/p")
+	p := r.Group("/av")
 	p.GET("/", getDiscussions)
 	p.GET("/:pid", getDiscussion)
 
-	t := r.Group("/t")
+	t := r.Group("/cv")
 	t.GET("/", getCategories)
 	t.GET("/:tid", getDiscussionsByCategory)
 
-	u := r.Group("/u")
-	u.GET("/me", getUserInformation)
+	u := r.Group("/up")
+	u.GET("/", getUserInformation)
 
 	api := r.Group("/api")
 	api.Use(protectMiddleware())

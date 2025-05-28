@@ -19,7 +19,7 @@ func initializeDbDrive(cfg *config) {
 		sqlite.Open(filepath.Join(cfg.rootfs, "data.db")+"?_journal=WAL&_vacuum=incremental"),
 		&gorm.Config{
 			TranslateError: true,
-			Logger:         logger.Default.LogMode(logger.Silent),
+			Logger:         logger.Default.LogMode(logger.Silent), // logger.Default.LogMode(logger.Info),
 		})
 	if err != nil {
 		log.Fatalln("error:", err)
