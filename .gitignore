@@ -1,3 +1,8 @@
 .idea/
+data/
+dist/*
+
 *_test.go
 test.go
+*.exe
+*.db

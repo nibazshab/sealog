@@ -161,7 +161,7 @@ func initializeRouter(r *gin.Engine) {
 	t.GET("/:tid", getDiscussionsByCategory)
 
 	u := r.Group("/up")
-	u.GET("/", getUserInformation)
+	u.GET("/", getUserId)
 
 	api := r.Group("/api")
 	api.Use(protectMiddleware())

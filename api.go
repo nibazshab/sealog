@@ -51,7 +51,7 @@ func getDiscussion(c *gin.Context) {
 		return
 	}
 
-	if id == 0 && (data.Deep == 2 || data.Topic.ModeId == 0) {
+	if id == -1 && (data.Deep == 2 || data.Topic.ModeId == 0) {
 		responseError(c, errors.New("access denied"), 404, "not found")
 		return
 	}
@@ -77,12 +77,12 @@ func getDiscussion(c *gin.Context) {
 	})
 }
 
-func getUserInformation(c *gin.Context) {
+func getUserId(c *gin.Context) {
 	id := c.MustGet("id").(int)
 
 	c.JSON(200, result[int]{
 		Code: 200,
-		Msg:  "get user information success",
+		Msg:  "get user id success",
 		Data: id,
 	})
 }
@@ -94,7 +94,7 @@ func getCategories(c *gin.Context) {
 
 	// SELECT * FROM `modes`
 	query := db
-	if id == 0 {
+	if id == -1 {
 		// SELECT * FROM `modes` WHERE deep <> 2
 		query = query.Where("deep <> ?", 2)
 	}
@@ -133,7 +133,7 @@ func getDiscussionsByCategory(c *gin.Context) {
 		return
 	}
 
-	if id == 0 {
+	if id == -1 {
 		deep, err := mode.queryDeep()
 		if err != nil {
 			responseError(c, err, 500, "server error")
@@ -183,7 +183,7 @@ func getDiscussions(c *gin.Context) {
 
 	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
 	query := db.Order("id DESC").Offset(urlquery.Offset).Limit(21)
-	if id == 0 {
+	if id == -1 {
 		// SELECT * FROM `topics` WHERE mode_id NOT IN (SELECT `id` FROM `modes` WHERE deep = 2)
 		// AND mode_id <> 0 ORDER BY id DESC LIMIT 21
 		subQuery := db.Model(&Mode{}).Select("id").Where("deep = ?", 2)
@@ -457,7 +457,7 @@ func authMiddleware() gin.HandlerFunc {
 		if ok {
 			c.Set("id", 1)
 		} else {
-			c.Set("id", 0)
+			c.Set("id", -1)
 		}
 		c.Next()
 	}
@@ -466,7 +466,7 @@ func authMiddleware() gin.HandlerFunc {
 func protectMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.MustGet("id").(int)
-		if id == 0 {
+		if id == -1 {
 			c.AbortWithStatusJSON(200, result[any]{
 				Code: 403,
 				Msg:  "access denied",
