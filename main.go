@@ -25,6 +25,7 @@ type config struct {
 	port   string
 	rootfs string
 	w      io.Writer
+	debug  bool
 }
 
 func main() {
@@ -79,8 +80,10 @@ func argsExecute(cfg *config) {
 	case "server":
 		args := flag.NewFlagSet("server", flag.ExitOnError)
 		var port int
+		var debug bool
 
 		args.IntVar(&port, "p", defaultPort, "server port")
+		args.BoolVar(&debug, "debug", false, "debug mode")
 
 		err := args.Parse(os.Args[2:])
 		if err != nil {
@@ -94,6 +97,7 @@ func argsExecute(cfg *config) {
 		}
 
 		cfg.port = strconv.Itoa(port)
+		cfg.debug = debug
 
 	case "reset-password":
 		initializeDbDrive(cfg)
@@ -124,6 +128,10 @@ func serverRun(cfg *config) {
 	gin.SetMode(gin.ReleaseMode)
 	gin.DisableConsoleColor()
 	gin.DefaultWriter = cfg.w
+
+	if cfg.debug {
+		gin.SetMode(gin.DebugMode)
+	}
 
 	r := gin.Default()
 	initializeRouter(r)

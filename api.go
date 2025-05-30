@@ -59,8 +59,8 @@ func getDiscussion(c *gin.Context) {
 	topic := data.Topic
 	var posts []*Post
 
-	// SELECT * FROM `posts` WHERE topic_id = 4
-	err = db.Where("topic_id = ?", topic.Id).Find(&posts).Error
+	// SELECT * FROM `posts` WHERE topic_id = 4 ORDER BY floor
+	err = db.Order("floor").Where("topic_id = ?", topic.Id).Find(&posts).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
