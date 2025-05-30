@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/gin-gonic/gin"
+
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -55,4 +57,17 @@ func initializeLogDrive(cfg *config) {
 	}
 	cfg.w = io.MultiWriter(os.Stdout, file)
 	log.SetOutput(cfg.w)
+}
+
+func initializeSrvDrive(cfg *config) {
+	gin.DisableConsoleColor()
+
+	if cfg.debug {
+		gin.SetMode(gin.DebugMode)
+		gin.DefaultWriter = os.Stdout
+		return
+	}
+
+	gin.SetMode(gin.ReleaseMode)
+	gin.DefaultWriter = cfg.w
 }

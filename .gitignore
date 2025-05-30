@@ -5,4 +5,5 @@ dist/*
 *_test.go
 test.go
 *.exe
+*.exe~
 *.db

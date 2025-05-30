@@ -33,6 +33,9 @@ func main() {
 	argsExecute(cfg)
 	initializeDbDrive(cfg)
 	initializeLogDrive(cfg)
+	initializeSrvDrive(cfg)
+	initializeAdminUser()
+	initializeJwtSecret()
 	serverRun(cfg)
 }
 
@@ -122,17 +125,6 @@ func argsExecute(cfg *config) {
 }
 
 func serverRun(cfg *config) {
-	initializeAdminUser()
-	initializeJwtSecret()
-
-	gin.SetMode(gin.ReleaseMode)
-	gin.DisableConsoleColor()
-	gin.DefaultWriter = cfg.w
-
-	if cfg.debug {
-		gin.SetMode(gin.DebugMode)
-	}
-
 	r := gin.Default()
 	initializeRouter(r)
 
