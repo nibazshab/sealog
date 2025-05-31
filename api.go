@@ -43,7 +43,7 @@ func getDiscussion(c *gin.Context) {
 		Joins("LEFT JOIN modes ON topics.mode_id = modes.id").
 		Where("topics.id = ?", tid).Scan(&data)
 	if rs.Error != nil {
-		responseError(c, err, 500, "server error")
+		responseError(c, rs.Error, 500, "server error")
 		return
 	}
 	if rs.RowsAffected == 0 {
@@ -435,7 +435,7 @@ func userLogin(c *gin.Context) {
 
 	ok := u.login(payload.Password)
 	if !ok {
-		responseError(c, err, 401, "password error")
+		responseError(c, errors.New("password error"), 401, "password error")
 		return
 	}
 	token, err := encodeToken()
