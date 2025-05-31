@@ -154,20 +154,19 @@ func initializeRouter(r *gin.Engine) {
 	r.GET("/favicon.ico", favicon)
 	r.GET("/robots.txt", robots)
 
-	r.Use(authMiddleware())
+	api := r.Group("/api")
+	api.Use(authMiddleware())
 
-	p := r.Group("/av")
+	p := api.Group("/av")
 	p.GET("/", getDiscussions)
 	p.GET("/:pid", getDiscussion)
 
-	t := r.Group("/cv")
+	t := api.Group("/cv")
 	t.GET("/", getCategories)
 	t.GET("/:tid", getDiscussionsByCategory)
 
-	u := r.Group("/up")
+	u := api.Group("/up")
 	u.GET("/", getUserId)
-
-	api := r.Group("/api")
 
 	auth := api.Group("/auth")
 	auth.POST("/login", userLogin)
