@@ -75,7 +75,7 @@ func initializeApplication() *config {
 
 func argsExecute(cfg *config) {
 	if len(os.Args) < 2 {
-		fmt.Println(man)
+		fmt.Print(man)
 		os.Exit(0)
 	}
 
@@ -115,7 +115,7 @@ func argsExecute(cfg *config) {
 		os.Exit(0)
 
 	case "-h", "--help":
-		fmt.Println(man)
+		fmt.Print(man)
 		os.Exit(0)
 
 	default:
@@ -150,6 +150,10 @@ func serverRun(cfg *config) {
 
 func initializeRouter(r *gin.Engine) {
 	r.Use(corsMiddleware())
+
+	r.GET("/favicon.ico", favicon)
+	r.GET("/robots.txt", robots)
+
 	r.Use(authMiddleware())
 
 	p := r.Group("/av")
@@ -164,10 +168,13 @@ func initializeRouter(r *gin.Engine) {
 	u.GET("/", getUserId)
 
 	api := r.Group("/api")
+
+	auth := api.Group("/auth")
+	auth.POST("/login", userLogin)
+
 	api.Use(protectMiddleware())
 
 	user := api.Group("/user")
-	user.POST("/login", userLogin)
 	user.POST("/update", userChangePassword)
 
 	category := api.Group("/category")
@@ -196,6 +203,7 @@ func corsMiddleware() gin.HandlerFunc {
 	})
 }
 
-const man = `available command:
-  server          start httpserver
-  reset-password  reset admin password`
+const man = `%s command:
+  server          start httpserver (use 'server -h' view help)
+  reset-password  reset admin password
+`
