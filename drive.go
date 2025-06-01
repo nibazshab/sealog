@@ -55,6 +55,7 @@ func initializeLogDrive(cfg *config) {
 	if err != nil {
 		log.Fatalln("error:", err)
 	}
+
 	cfg.w = io.MultiWriter(os.Stdout, file)
 	log.SetOutput(cfg.w)
 }
@@ -64,7 +65,6 @@ func initializeSrvDrive(cfg *config) {
 
 	if cfg.debug {
 		gin.SetMode(gin.DebugMode)
-		gin.DefaultWriter = os.Stdout
 		return
 	}
 
