@@ -31,8 +31,8 @@ type config struct {
 func main() {
 	cfg := initializeApplication()
 	argsExecute(cfg)
-	initializeDbDrive(cfg)
 	initializeLogDrive(cfg)
+	initializeDbDrive(cfg)
 	initializeSrvDrive(cfg)
 	initializeAdminUser()
 	initializeJwtSecret()

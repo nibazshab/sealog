@@ -51,6 +51,10 @@ func closeDb() {
 }
 
 func initializeLogDrive(cfg *config) {
+	if cfg.debug {
+		return
+	}
+
 	file, err := os.OpenFile(filepath.Join(cfg.rootfs, "log.log"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		log.Fatalln("error:", err)
@@ -61,13 +65,12 @@ func initializeLogDrive(cfg *config) {
 }
 
 func initializeSrvDrive(cfg *config) {
-	gin.DisableConsoleColor()
-
 	if cfg.debug {
 		gin.SetMode(gin.DebugMode)
 		return
 	}
 
+	gin.DisableConsoleColor()
 	gin.SetMode(gin.ReleaseMode)
 	gin.DefaultWriter = cfg.w
 }
