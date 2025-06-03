@@ -12,7 +12,7 @@ type (
 	Mode struct {
 		Id   int    `gorm:"primaryKey" json:"id"`
 		Name string `gorm:"not null"   json:"name"`
-		Pub  bool   `json:"pub"`
+		Pub  bool   `                  json:"pub"`
 	}
 
 	// Topic 帖子主题
