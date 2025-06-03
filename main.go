@@ -202,7 +202,7 @@ func corsMiddleware() gin.HandlerFunc {
 	})
 }
 
-const man = `%s command:
+const man = `% command:
   server          start httpserver (use 'server -h' view help)
   reset-password  reset admin password
 `

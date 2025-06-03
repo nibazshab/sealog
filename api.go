@@ -35,11 +35,11 @@ func getDiscussion(c *gin.Context) {
 
 	var data struct {
 		Topic
-		Deep int
+		Pub bool
 	}
 
-	// SELECT topics.*, modes.deep FROM `topics` LEFT JOIN modes ON topics.mode_id = modes.id WHERE topics.id = 4
-	rs := db.Table("topics").Select("topics.*, modes.deep").
+	// SELECT topics.*, modes.pub FROM `topics` LEFT JOIN modes ON topics.mode_id = modes.id WHERE topics.id = 4
+	rs := db.Table("topics").Select("topics.*, modes.pub").
 		Joins("LEFT JOIN modes ON topics.mode_id = modes.id").
 		Where("topics.id = ?", tid).Scan(&data)
 	if rs.Error != nil {
@@ -51,7 +51,7 @@ func getDiscussion(c *gin.Context) {
 		return
 	}
 
-	if id == -1 && (data.Deep == 2 || data.Topic.ModeId == 0) {
+	if id == -1 && (data.Pub == false || data.Topic.ModeId == 0) {
 		responseError(c, errors.New("access denied"), 404, "not found")
 		return
 	}
@@ -95,8 +95,8 @@ func getCategories(c *gin.Context) {
 	// SELECT * FROM `modes`
 	query := db
 	if id == -1 {
-		// SELECT * FROM `modes` WHERE deep <> 2
-		query = query.Where("deep <> ?", 2)
+		// SELECT * FROM `modes` WHERE pub <> false
+		query = query.Where("pub <> ?", false)
 	}
 	err := query.Find(&modes).Error
 	if err != nil {
@@ -134,12 +134,12 @@ func getDiscussionsByCategory(c *gin.Context) {
 	}
 
 	if id == -1 {
-		deep, err := mode.queryDeep()
+		pub, err := mode.queryPublic()
 		if err != nil {
 			responseError(c, err, 500, "server error")
 			return
 		}
-		if deep == 2 {
+		if pub == false {
 			responseError(c, errors.New("access denied"), 404, "not found")
 			return
 		}
@@ -184,9 +184,9 @@ func getDiscussions(c *gin.Context) {
 	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
 	query := db.Order("id DESC").Offset(urlquery.Offset).Limit(21)
 	if id == -1 {
-		// SELECT * FROM `topics` WHERE mode_id NOT IN (SELECT `id` FROM `modes` WHERE deep = 2)
+		// SELECT * FROM `topics` WHERE mode_id NOT IN (SELECT `id` FROM `modes` WHERE pub = false)
 		// AND mode_id <> 0 ORDER BY id DESC LIMIT 21
-		subQuery := db.Model(&Mode{}).Select("id").Where("deep = ?", 2)
+		subQuery := db.Model(&Mode{}).Select("id").Where("pub = ?", false)
 		query = query.Where("mode_id NOT IN (?)", subQuery).Where("mode_id <> 0")
 	}
 	err := query.Find(&topics).Error
@@ -213,7 +213,7 @@ func getDiscussions(c *gin.Context) {
 func createCategory(c *gin.Context) {
 	var payload struct {
 		Name string `json:"name" binding:"required"`
-		Deep int8   `json:"deep" binding:"required"`
+		Pub  bool   `json:"pub"  binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
@@ -222,7 +222,7 @@ func createCategory(c *gin.Context) {
 
 	mode := Mode{
 		Name: payload.Name,
-		Deep: payload.Deep,
+		Pub:  payload.Pub,
 	}
 	publicCreate(c, &mode)
 }
@@ -231,14 +231,14 @@ func updateCategory(c *gin.Context) {
 	var payload struct {
 		Id   int    `json:"id" binding:"required"`
 		Name string `json:"name"`
-		Deep int8   `json:"deep"`
+		Pub  bool   `json:"pub"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
 	}
 
-	if payload.Name == "" && payload.Deep == 0 {
+	if payload.Name == "" {
 		responseError(c, errors.New("missing value"), 400, "payload error")
 		return
 	}
@@ -248,7 +248,7 @@ func updateCategory(c *gin.Context) {
 	}
 	newMode := Mode{
 		Name: payload.Name,
-		Deep: payload.Deep,
+		Pub:  payload.Pub,
 	}
 	publicUpdate(c, &mode, &newMode)
 }

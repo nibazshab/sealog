@@ -34,7 +34,7 @@ func TestNewMode(t *testing.T) {
 
 		mode := Mode{
 			Name: string(b),
-			Deep: int8(rand.Intn(3) + 1),
+			Pub:  rand.Intn(2) == 1,
 		}
 
 		if err := mode.create(nil); err != nil {

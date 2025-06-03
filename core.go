@@ -12,7 +12,7 @@ type (
 	Mode struct {
 		Id   int    `gorm:"primaryKey" json:"id"`
 		Name string `gorm:"not null"   json:"name"`
-		Deep int8   `gorm:"default:1"  json:"deep"` // 1 普通, 2 隐藏, 3 公开
+		Pub  bool   `json:"pub"`
 	}
 
 	// Topic 帖子主题
@@ -34,9 +34,9 @@ type (
 	}
 )
 
-// m.Name, m.Deep
+// m.Name, m.Pub
 func (m *Mode) create(interface{}) error {
-	// INSERT INTO `modes` (`name`,`deep`) VALUES ("guest",3) RETURNING `id`
+	// INSERT INTO `modes` (`name`,`pub`) VALUES ("test",true) RETURNING `id`
 	return db.Create(m).Error
 }
 
@@ -53,7 +53,7 @@ func (m *Mode) BeforeDelete(tx *gorm.DB) error {
 }
 
 // m.Id
-// m.Id, m.Name, m.Deep
+// m.Id, m.Name, m.Pub
 func (m *Mode) update(data interface{}) error {
 	// UPDATE `modes` SET `id`=11,`name`="dd" WHERE `id` = 1
 	return db.Set("data", data).
@@ -213,19 +213,19 @@ func (m *Mode) verifyExist() error {
 }
 
 // m.Id
-func (m *Mode) queryDeep() (int, error) {
-	var num int
+func (m *Mode) queryPublic() (bool, error) {
+	var b bool
 
-	// SELECT `deep` FROM `modes` WHERE `modes`.`id` = 2 ORDER BY `modes`.`id` LIMIT 1
-	err := db.Select("deep").First(m).Scan(&num).Error
-	return num, err
+	// SELECT `pub` FROM `modes` WHERE `modes`.`id` = 1
+	err := db.Model(m).Select("pub").Scan(&b).Error
+	return b, err
 }
 
 // t.Id
 func (t *Topic) queryFloors() (int, error) {
 	var num int
 
-	// SELECT `floors` FROM `topics` WHERE `topics`.`id` = 2 ORDER BY `topics`.`id` LIMIT 1
-	err := db.Select("floors").First(t).Scan(&num).Error
+	// SELECT `floors` FROM `topics` WHERE `topics`.`id` = 1
+	err := db.Model(t).Select("floors").Scan(&num).Error
 	return num, err
 }

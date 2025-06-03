@@ -19,7 +19,7 @@ interface Post {
 interface Mode {
     id: number
     name: string
-    deep: number
+    pub: boolean
 }
 
 interface Result<T> {
