@@ -18,7 +18,7 @@ func TestMain(m *testing.M) {
 	db.TranslateError = true
 	db.Logger = logger.Default.LogMode(logger.Info)
 
-	db.AutoMigrate(&Mode{}, &Topic{}, &Post{}, &User{}, &Key{})
+	db.AutoMigrate(&Mode{}, &Topic{}, &Post{})
 
 	println(ex)
 	m.Run()

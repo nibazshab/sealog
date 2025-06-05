@@ -32,7 +32,7 @@ func initializeDbDrive(cfg *config) {
 	}
 
 	err = db.AutoMigrate(
-		&Mode{}, &Topic{}, &Post{}, &User{}, &Key{},
+		&Mode{}, &Topic{}, &Post{}, &Auth{}, &Hmac{},
 	)
 	if err != nil {
 		log.Fatalln("error:", err)

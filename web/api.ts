@@ -29,7 +29,7 @@ interface Result<T> {
 }
 
 const req = axios.create({
-    baseURL: base + "/api",
+    baseURL: base,
     headers: {
         "Content-Type": "application/json;charset=utf-8"
     },
@@ -46,32 +46,7 @@ req.interceptors.request.use(config => {
 
 req.interceptors.response.use(response => response.data)
 
-export const getUserId = (): Promise<Result<number>> => {
-    return req.get("/up/")
-}
-
-export const getCategories = (): Promise<Result<Mode[]>> => {
-    return req.get("/cv/")
-}
-
-export const getDiscussions = (
-    offset?: number
-): Promise<Result<Topic[]>> => {
-    return req.get("/av/", {
-        params: offset != null ? {offset} : undefined
-    })
-}
-
-export const getDiscussionsByCategory = (
-    id: string,
-    offset?: number
-): Promise<Result<Topic[]>> => {
-    return req.get("/cv/" + id, {
-        params: offset != null ? {offset} : undefined
-    })
-}
-
-export const getDiscussion = (
+export const getAv = (
     id: string
 ): Promise<Result<{
     topic: Topic
@@ -80,7 +55,126 @@ export const getDiscussion = (
     return req.get("/av/" + id)
 }
 
-export const userLogin = (
+export const getCvs = (): Promise<Result<Mode[]>> => {
+    return req.get("/cv/")
+}
+
+export const getAvs = (
+    offset?: number
+): Promise<Result<Topic[]>> => {
+    return req.get("/av/", {
+        params: offset != null ? {offset} : undefined
+    })
+}
+
+export const getAvsByCv = (
+    id: string,
+    offset?: number
+): Promise<Result<Topic[]>> => {
+    return req.get("/cv/" + id, {
+        params: offset != null ? {offset} : undefined
+    })
+}
+
+export const getUp = (): Promise<Result<number>> => {
+    return req.get("/up")
+}
+
+export const createCv = (
+    name: string,
+    deep: number
+): Promise<Result<Mode>> => {
+    return req.post("/api/cv/create", {
+        name,
+        deep
+    })
+}
+
+export const deleteCv = (
+    id: number
+): Promise<Result<void>> => {
+    return req.post("/api/cv/delete", {
+        id
+    })
+}
+
+export const updateCv = (
+    id: number,
+    name: string,
+    deep: number
+): Promise<Result<Mode>> => {
+    return req.post("/api/cv/update", {
+        id,
+        name,
+        deep
+    })
+}
+
+export const createAv = (
+    title: string,
+    mode_id: number,
+    content: string
+): Promise<Result<Topic>> => {
+    return req.post("/api/av/create", {
+        title,
+        mode_id,
+        content
+    })
+}
+
+export const deleteAv = (
+    id: number
+): Promise<Result<void>> => {
+    return req.post("/api/av/delete", {
+        id
+    })
+}
+
+export const updateAv = (
+    id: number,
+    title: string,
+    mode_id: number
+): Promise<Result<Topic>> => {
+    return req.post("/api/av/update", {
+        id,
+        title,
+        mode_id
+    })
+}
+
+export const createFl = (
+    topic_id: number,
+    content: string
+): Promise<Result<Post>> => {
+    return req.post("/api/fl/create", {
+        topic_id,
+        content
+    })
+}
+
+export const deleteFl = (
+    topic_id: number,
+    floor: number
+): Promise<Result<void>> => {
+    return req.post("/api/fl/delete", {
+        topic_id,
+        floor
+    })
+}
+
+export const updateFl = (
+    topic_id: number,
+    floor: number,
+    content: string
+): Promise<Result<Post>> => {
+    return req.post("/api/fl/update", {
+        topic_id,
+        floor,
+        content
+    })
+}
+
+export const login = (
     password: string
 ): Promise<Result<string>> => {
     return req.post("/auth/login", {
@@ -88,104 +182,10 @@ export const userLogin = (
     })
 }
 
-export const userChangePassword = (
+export const changeUp = (
     password: string
 ): Promise<Result<void>> => {
-    return req.post("/user/update", {
+    return req.post("/api/up/change", {
         password
-    })
-}
-
-export const createCategory = (
-    name: string,
-    deep: number
-): Promise<Result<Mode>> => {
-    return req.post("/category/create", {
-        name,
-        deep
-    })
-}
-
-export const updateCategory = (
-    id: number,
-    name: string,
-    deep: number
-): Promise<Result<Mode>> => {
-    return req.post("/category/update", {
-        id,
-        name,
-        deep
-    })
-}
-
-export const deleteCategory = (
-    id: number
-): Promise<Result<void>> => {
-    return req.post("/category/delete", {
-        id
-    })
-}
-
-export const createDiscussion = (
-    title: string,
-    mode_id: number,
-    content: string
-): Promise<Result<Topic>> => {
-    return req.post("/discussion/create", {
-        title,
-        mode_id,
-        content
-    })
-}
-
-export const updateDiscussion = (
-    id: number,
-    title: string,
-    mode_id: number
-): Promise<Result<Topic>> => {
-    return req.post("/discussion/update", {
-        id,
-        title,
-        mode_id
-    })
-}
-
-export const deleteDiscussion = (
-    id: number
-): Promise<Result<void>> => {
-    return req.post("/discussion/delete", {
-        id
-    })
-}
-
-export const createComment = (
-    topic_id: number,
-    content: string
-): Promise<Result<Post>> => {
-    return req.post("/comment/create", {
-        topic_id,
-        content
-    })
-}
-
-export const updateComment = (
-    topic_id: number,
-    floor: number,
-    content: string
-): Promise<Result<Post>> => {
-    return req.post("/comment/update", {
-        topic_id,
-        floor,
-        content
-    })
-}
-
-export const deleteComment = (
-    topic_id: number,
-    floor: number
-): Promise<Result<void>> => {
-    return req.post("/comment/delete", {
-        topic_id,
-        floor
     })
 }

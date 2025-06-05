@@ -34,8 +34,8 @@ func main() {
 	initializeLogDrive(cfg)
 	initializeDbDrive(cfg)
 	initializeSrvDrive(cfg)
-	initializeAdminUser()
-	initializeJwtSecret()
+	initializeAuth()
+	initializeHmac()
 	serverRun(cfg)
 }
 
@@ -104,13 +104,7 @@ func argsExecute(cfg *config) {
 
 	case "reset-password":
 		initializeDbDrive(cfg)
-		rawPassword, err := resetAdminPassword()
-		if err != nil {
-			fmt.Println("error:", err)
-			os.Exit(1)
-		}
-
-		fmt.Println("new password:", rawPassword)
+		fmt.Println("new password:", generatePassword())
 		closeDb()
 		os.Exit(0)
 
@@ -151,45 +145,41 @@ func serverRun(cfg *config) {
 func initializeRouter(r *gin.Engine) {
 	r.Use(corsMiddleware())
 
-	r.GET("/favicon.ico", favicon)
-	r.GET("/robots.txt", robots)
+	res := r.Group("/")
+	res.GET("/favicon.ico", favicon)
+	res.GET("/robots.txt", robots)
+
+	res.Use(authMiddleware())
+
+	res.GET("/av/", getTopics)
+	res.GET("/av/:pid", getTopicAndPosts)
+	res.GET("/cv/", getModes)
+	res.GET("/cv/:tid", getTopicsByMode)
+	res.GET("/up", getAuthStatus)
+
+	res.POST("/auth/login", loginAuth)
 
 	api := r.Group("/api")
 	api.Use(authMiddleware())
-
-	p := api.Group("/av")
-	p.GET("/", getDiscussions)
-	p.GET("/:pid", getDiscussion)
-
-	t := api.Group("/cv")
-	t.GET("/", getCategories)
-	t.GET("/:tid", getDiscussionsByCategory)
-
-	u := api.Group("/up")
-	u.GET("/", getUserId)
-
-	auth := api.Group("/auth")
-	auth.POST("/login", userLogin)
-
 	api.Use(protectMiddleware())
 
-	user := api.Group("/user")
-	user.POST("/update", userChangePassword)
+	up := api.Group("/up")
+	up.POST("/change", changeAuth)
 
-	category := api.Group("/category")
-	category.POST("/create", createCategory)
-	category.POST("/update", updateCategory)
-	category.POST("/delete", deleteCategory)
+	cv := api.Group("/cv")
+	cv.POST("/create", createMode)
+	cv.POST("/update", updateMode)
+	cv.POST("/delete", deleteMode)
 
-	discussion := api.Group("/discussion")
-	discussion.POST("/create", createDiscussion)
-	discussion.POST("/update", updateDiscussion)
-	discussion.POST("/delete", deleteDiscussion)
+	av := api.Group("/av")
+	av.POST("/create", createTopic)
+	av.POST("/update", updateTopic)
+	av.POST("/delete", deleteTopic)
 
-	comment := api.Group("/comment")
-	comment.POST("/create", createComment)
-	comment.POST("/update", updateComment)
-	comment.POST("/delete", deleteComment)
+	fl := api.Group("/fl")
+	fl.POST("/create", createPost)
+	fl.POST("/update", updatePost)
+	fl.POST("/delete", deletePost)
 }
 
 func corsMiddleware() gin.HandlerFunc {
