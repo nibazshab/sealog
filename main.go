@@ -30,7 +30,7 @@ type config struct {
 
 func main() {
 	cfg := initializeApplication()
-	argsExecute(cfg)
+	commandExecute(cfg)
 	initializeLogDrive(cfg)
 	initializeDbDrive(cfg)
 	initializeSrvDrive(cfg)
@@ -73,7 +73,7 @@ func initializeApplication() *config {
 	}
 }
 
-func argsExecute(cfg *config) {
+func commandExecute(cfg *config) {
 	if len(os.Args) < 2 {
 		fmt.Print(man)
 		os.Exit(0)
@@ -145,26 +145,20 @@ func serverRun(cfg *config) {
 func initializeRouter(r *gin.Engine) {
 	r.Use(corsMiddleware())
 
-	res := r.Group("/")
-	res.GET("/favicon.ico", favicon)
-	res.GET("/robots.txt", robots)
-
-	res.Use(authMiddleware())
-
-	res.GET("/av/", getTopics)
-	res.GET("/av/:pid", getTopicAndPosts)
-	res.GET("/cv/", getModes)
-	res.GET("/cv/:tid", getTopicsByMode)
-	res.GET("/up", getAuthStatus)
-
-	res.POST("/auth/login", loginAuth)
-
 	api := r.Group("/api")
 	api.Use(authMiddleware())
+
+	api.GET("/av", getTopics)
+	api.GET("/cv", getModes)
+	api.GET("/av/:aid", getTopicAndPosts)
+	api.GET("/cv/:cid", getTopicsByMode)
+	api.GET("/uid", getAuthUid)
+	api.POST("/auth/login", loginAuth)
+
 	api.Use(protectMiddleware())
 
-	up := api.Group("/up")
-	up.POST("/change", changeAuth)
+	auth := api.Group("/auth")
+	auth.POST("/change", changeAuth)
 
 	cv := api.Group("/cv")
 	cv.POST("/create", createMode)
@@ -180,6 +174,9 @@ func initializeRouter(r *gin.Engine) {
 	fl.POST("/create", createPost)
 	fl.POST("/update", updatePost)
 	fl.POST("/delete", deletePost)
+
+	s := r.Group("/")
+	static(s)
 }
 
 func corsMiddleware() gin.HandlerFunc {

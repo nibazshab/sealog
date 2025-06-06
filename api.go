@@ -25,10 +25,65 @@ type core interface {
 	delete() error
 }
 
+// api/av
+func getTopics(c *gin.Context) {
+	uid := c.MustGet("uid").(int)
+	var urlquery struct {
+		Offset int `form:"offset" binding:"min=0"`
+	}
+	if err := c.ShouldBindQuery(&urlquery); err != nil {
+		urlquery.Offset = 0
+	}
+
+	var topics []*Topic
+
+	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
+	query := db.Order("id DESC").Offset(urlquery.Offset).Limit(21)
+	if uid == -1 {
+		// SELECT * FROM `topics` WHERE mode_id NOT IN (SELECT `id` FROM `modes` WHERE pub = false)
+		// AND mode_id <> 0 ORDER BY id DESC LIMIT 21
+		subQuery := db.Model(&Mode{}).Select("id").Where("pub = ?", false)
+		query = query.Where("mode_id NOT IN (?)", subQuery).Where("mode_id <> 0")
+	}
+	err := query.Find(&topics).Error
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	if len(topics) == 21 {
+		topics[20] = &Topic{Id: -1}
+	}
+
+	responseSuccess(c, topics)
+}
+
+// api/cv
+func getModes(c *gin.Context) {
+	uid := c.MustGet("uid").(int)
+
+	var modes []*Mode
+
+	// SELECT * FROM `modes`
+	query := db
+	if uid == -1 {
+		// SELECT * FROM `modes` WHERE pub <> false
+		query = query.Where("pub <> ?", false)
+	}
+	err := query.Find(&modes).Error
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	responseSuccess(c, modes)
+}
+
+// api/av/:aid
 func getTopicAndPosts(c *gin.Context) {
-	id := c.MustGet("id").(int)
-	tid, err := strconv.Atoi(c.Param("pid"))
-	if err != nil || tid <= 0 {
+	uid := c.MustGet("uid").(int)
+	aid, err := strconv.Atoi(c.Param("aid"))
+	if err != nil || aid <= 0 {
 		responseError(c, err, 404, "not found")
 		return
 	}
@@ -41,7 +96,7 @@ func getTopicAndPosts(c *gin.Context) {
 	// SELECT topics.*, modes.pub FROM `topics` LEFT JOIN modes ON topics.mode_id = modes.id WHERE topics.id = 4
 	rs := db.Table("topics").Select("topics.*, modes.pub").
 		Joins("LEFT JOIN modes ON topics.mode_id = modes.id").
-		Where("topics.id = ?", tid).Scan(&data)
+		Where("topics.id = ?", aid).Scan(&data)
 	if rs.Error != nil {
 		responseError(c, rs.Error, 500, "server error")
 		return
@@ -51,7 +106,7 @@ func getTopicAndPosts(c *gin.Context) {
 		return
 	}
 
-	if id == -1 && (data.Pub == false || data.Topic.ModeId == 0) {
+	if uid == -1 && (data.Pub == false || data.Topic.ModeId == 0) {
 		responseError(c, errors.New("access denied"), 404, "not found")
 		return
 	}
@@ -72,62 +127,11 @@ func getTopicAndPosts(c *gin.Context) {
 	})
 }
 
-func getModes(c *gin.Context) {
-	id := c.MustGet("id").(int)
-
-	var modes []*Mode
-
-	// SELECT * FROM `modes`
-	query := db
-	if id == -1 {
-		// SELECT * FROM `modes` WHERE pub <> false
-		query = query.Where("pub <> ?", false)
-	}
-	err := query.Find(&modes).Error
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-
-	responseSuccess(c, modes)
-}
-
-func getTopics(c *gin.Context) {
-	id := c.MustGet("id").(int)
-	var urlquery struct {
-		Offset int `form:"offset" binding:"min=0"`
-	}
-	if err := c.ShouldBindQuery(&urlquery); err != nil {
-		urlquery.Offset = 0
-	}
-
-	var topics []*Topic
-
-	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
-	query := db.Order("id DESC").Offset(urlquery.Offset).Limit(21)
-	if id == -1 {
-		// SELECT * FROM `topics` WHERE mode_id NOT IN (SELECT `id` FROM `modes` WHERE pub = false)
-		// AND mode_id <> 0 ORDER BY id DESC LIMIT 21
-		subQuery := db.Model(&Mode{}).Select("id").Where("pub = ?", false)
-		query = query.Where("mode_id NOT IN (?)", subQuery).Where("mode_id <> 0")
-	}
-	err := query.Find(&topics).Error
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-
-	if len(topics) == 21 {
-		topics[20] = &Topic{Id: -1}
-	}
-
-	responseSuccess(c, topics)
-}
-
+// api/cv/:cid
 func getTopicsByMode(c *gin.Context) {
-	id := c.MustGet("id").(int)
-	mid, err := strconv.Atoi(c.Param("tid"))
-	if err != nil || mid <= 0 {
+	uid := c.MustGet("uid").(int)
+	cid, err := strconv.Atoi(c.Param("cid"))
+	if err != nil || cid <= 0 {
 		responseError(c, err, 404, "not found")
 		return
 	}
@@ -139,14 +143,14 @@ func getTopicsByMode(c *gin.Context) {
 	}
 
 	mode := Mode{
-		Id: mid,
+		Id: cid,
 	}
 	if err = mode.verifyExist(); err != nil {
 		responseError(c, err, 404, "not found")
 		return
 	}
 
-	if id == -1 {
+	if uid == -1 {
 		pub, err := mode.queryPublic()
 		if err != nil {
 			responseError(c, err, 500, "server error")
@@ -162,7 +166,7 @@ func getTopicsByMode(c *gin.Context) {
 
 	// SELECT * FROM `topics` WHERE mode_id = 1 ORDER BY id DESC LIMIT 21
 	err = db.Order("id DESC").Offset(urlquery.Offset).Limit(21).
-		Where("mode_id = ?", mid).Find(&topics).Error
+		Where("mode_id = ?", cid).Find(&topics).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
@@ -175,12 +179,7 @@ func getTopicsByMode(c *gin.Context) {
 	responseSuccess(c, topics)
 }
 
-func getAuthStatus(c *gin.Context) {
-	id := c.MustGet("id").(int)
-
-	responseSuccess(c, id)
-}
-
+// api/cv/create
 func createMode(c *gin.Context) {
 	var payload struct {
 		Name string `json:"name" binding:"required"`
@@ -205,6 +204,7 @@ func createMode(c *gin.Context) {
 	responseSuccess(c, obj)
 }
 
+// api/cv/delete
 func deleteMode(c *gin.Context) {
 	var payload struct {
 		Id int `json:"id" binding:"required"`
@@ -227,6 +227,7 @@ func deleteMode(c *gin.Context) {
 	responseSuccess(c, (*struct{})(nil))
 }
 
+// api/cv/update
 func updateMode(c *gin.Context) {
 	var payload struct {
 		Id   int    `json:"id" binding:"required"`
@@ -260,6 +261,7 @@ func updateMode(c *gin.Context) {
 	responseSuccess(c, obj)
 }
 
+// api/av/create
 func createTopic(c *gin.Context) {
 	var payload struct {
 		Title   string `json:"title"    binding:"required"`
@@ -291,6 +293,7 @@ func createTopic(c *gin.Context) {
 	})
 }
 
+// api/av/delete
 func deleteTopic(c *gin.Context) {
 	var payload struct {
 		Id int `json:"id" binding:"required"`
@@ -313,6 +316,7 @@ func deleteTopic(c *gin.Context) {
 	responseSuccess(c, (*struct{})(nil))
 }
 
+// api/av/update
 func updateTopic(c *gin.Context) {
 	var payload struct {
 		Id     int    `json:"id" binding:"required"`
@@ -346,6 +350,7 @@ func updateTopic(c *gin.Context) {
 	responseSuccess(c, obj)
 }
 
+// api/fl/create
 func createPost(c *gin.Context) {
 	var payload struct {
 		TopicId int    `json:"topic_id" binding:"required"`
@@ -370,6 +375,7 @@ func createPost(c *gin.Context) {
 	responseSuccess(c, obj)
 }
 
+// api/fl/delete
 func deletePost(c *gin.Context) {
 	var payload struct {
 		TopicId int `json:"topic_id" binding:"required"`
@@ -394,6 +400,7 @@ func deletePost(c *gin.Context) {
 	responseSuccess(c, (*struct{})(nil))
 }
 
+// api/fl/update
 func updatePost(c *gin.Context) {
 	var payload struct {
 		TopicId int    `json:"topic_id" binding:"required"`
@@ -422,6 +429,14 @@ func updatePost(c *gin.Context) {
 	responseSuccess(c, obj)
 }
 
+// api/uid
+func getAuthUid(c *gin.Context) {
+	uid := c.MustGet("uid").(int)
+
+	responseSuccess(c, uid)
+}
+
+// api/auth/login
 func loginAuth(c *gin.Context) {
 	var payload struct {
 		Password string `json:"password" binding:"required"`
@@ -452,6 +467,7 @@ func loginAuth(c *gin.Context) {
 	responseSuccess(c, token)
 }
 
+// api/auth/change
 func changeAuth(c *gin.Context) {
 	var payload struct {
 		Password string `json:"password" binding:"required"`
@@ -476,9 +492,9 @@ func authMiddleware() gin.HandlerFunc {
 		token := c.Request.Header.Get("Authorization")
 		ok := decodeToken(token)
 		if ok {
-			c.Set("id", 1)
+			c.Set("uid", 1)
 		} else {
-			c.Set("id", -1)
+			c.Set("uid", -1)
 		}
 		c.Next()
 	}
@@ -486,9 +502,9 @@ func authMiddleware() gin.HandlerFunc {
 
 func protectMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		id := c.MustGet("id").(int)
-		if id == -1 {
-			c.AbortWithStatusJSON(200, result[any]{
+		uid := c.MustGet("uid").(int)
+		if uid == -1 {
+			c.AbortWithStatusJSON(403, result[*struct{}]{
 				Code: 403,
 				Msg:  "access denied",
 				Data: nil,
@@ -510,7 +526,7 @@ func responseSuccess[T any](c *gin.Context, data T) {
 func responseError(c *gin.Context, err error, code int, msg string) {
 	log.Println("error:", err)
 
-	c.JSON(200, result[*struct{}]{
+	c.JSON(code, result[*struct{}]{
 		Code: code,
 		Msg:  msg,
 		Data: nil,

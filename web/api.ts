@@ -28,8 +28,13 @@ interface Result<T> {
     data?: T
 }
 
+interface Resource {
+    topic: Topic
+    posts: Post[]
+}
+
 const req = axios.create({
-    baseURL: base,
+    baseURL: base + "/api",
     headers: {
         "Content-Type": "application/json;charset=utf-8"
     },
@@ -46,45 +51,38 @@ req.interceptors.request.use(config => {
 
 req.interceptors.response.use(response => response.data)
 
-export const getAv = (
-    id: string
-): Promise<Result<{
-    topic: Topic
-    posts: Post[]
-}>> => {
-    return req.get("/av/" + id)
-}
-
-export const getCvs = (): Promise<Result<Mode[]>> => {
-    return req.get("/cv/")
-}
-
 export const getAvs = (
     offset?: number
 ): Promise<Result<Topic[]>> => {
-    return req.get("/av/", {
+    return req.get("/av", {
         params: offset != null ? {offset} : undefined
     })
+}
+
+export const getCvs = (): Promise<Result<Mode[]>> => {
+    return req.get("/cv")
+}
+
+export const getAv = (
+    aid: string
+): Promise<Result<Resource>> => {
+    return req.get("/av/" + aid)
 }
 
 export const getAvsByCv = (
-    id: string,
+    cid: string,
     offset?: number
 ): Promise<Result<Topic[]>> => {
-    return req.get("/cv/" + id, {
+    return req.get("/cv/" + cid, {
         params: offset != null ? {offset} : undefined
     })
-}
-
-export const getUp = (): Promise<Result<number>> => {
-    return req.get("/up")
 }
 
 export const createCv = (
     name: string,
     deep: number
 ): Promise<Result<Mode>> => {
-    return req.post("/api/cv/create", {
+    return req.post("/cv/create", {
         name,
         deep
     })
@@ -93,7 +91,7 @@ export const createCv = (
 export const deleteCv = (
     id: number
 ): Promise<Result<void>> => {
-    return req.post("/api/cv/delete", {
+    return req.post("/cv/delete", {
         id
     })
 }
@@ -103,7 +101,7 @@ export const updateCv = (
     name: string,
     deep: number
 ): Promise<Result<Mode>> => {
-    return req.post("/api/cv/update", {
+    return req.post("/cv/update", {
         id,
         name,
         deep
@@ -114,8 +112,8 @@ export const createAv = (
     title: string,
     mode_id: number,
     content: string
-): Promise<Result<Topic>> => {
-    return req.post("/api/av/create", {
+): Promise<Result<Resource>> => {
+    return req.post("/av/create", {
         title,
         mode_id,
         content
@@ -125,7 +123,7 @@ export const createAv = (
 export const deleteAv = (
     id: number
 ): Promise<Result<void>> => {
-    return req.post("/api/av/delete", {
+    return req.post("/av/delete", {
         id
     })
 }
@@ -135,7 +133,7 @@ export const updateAv = (
     title: string,
     mode_id: number
 ): Promise<Result<Topic>> => {
-    return req.post("/api/av/update", {
+    return req.post("/av/update", {
         id,
         title,
         mode_id
@@ -146,7 +144,7 @@ export const createFl = (
     topic_id: number,
     content: string
 ): Promise<Result<Post>> => {
-    return req.post("/api/fl/create", {
+    return req.post("/fl/create", {
         topic_id,
         content
     })
@@ -156,7 +154,7 @@ export const deleteFl = (
     topic_id: number,
     floor: number
 ): Promise<Result<void>> => {
-    return req.post("/api/fl/delete", {
+    return req.post("/fl/delete", {
         topic_id,
         floor
     })
@@ -167,14 +165,18 @@ export const updateFl = (
     floor: number,
     content: string
 ): Promise<Result<Post>> => {
-    return req.post("/api/fl/update", {
+    return req.post("/fl/update", {
         topic_id,
         floor,
         content
     })
 }
 
-export const login = (
+export const getUid = (): Promise<Result<number>> => {
+    return req.get("/uid")
+}
+
+export const loginAuth = (
     password: string
 ): Promise<Result<string>> => {
     return req.post("/auth/login", {
@@ -182,10 +184,10 @@ export const login = (
     })
 }
 
-export const changeUp = (
+export const changeAuth = (
     password: string
 ): Promise<Result<void>> => {
-    return req.post("/api/up/change", {
+    return req.post("/auth/change", {
         password
     })
 }
