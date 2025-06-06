@@ -40,3 +40,5 @@ func static(s *gin.RouterGroup) {
 		c.FileFromFS("/", http.FS(dist))
 	})
 }
+
+// todo 页面如何生成呢？应当支持 SEO 并且能使用 JSON api 获取数据，不能纯 SPA
