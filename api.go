@@ -14,9 +14,14 @@ type result[T any] struct {
 	Data T      `json:"data,omitempty"`
 }
 
-type resource struct {
+type avData struct {
 	Topic Topic  `json:"topic"`
 	Posts []Post `json:"posts"`
+}
+
+type cvData struct {
+	Mode   Mode    `json:"mode"`
+	Topics []Topic `json:"topics"`
 }
 
 type core interface {
@@ -35,24 +40,20 @@ func getTopics(c *gin.Context) {
 		urlquery.Offset = 0
 	}
 
-	var topics []*Topic
-
-	// SELECT * FROM `topics` ORDER BY id DESC LIMIT 21
-	query := db.Order("id DESC").Offset(urlquery.Offset).Limit(21)
+	var topics []Topic
+	var err error
 	if uid == -1 {
-		// SELECT * FROM `topics` WHERE mode_id NOT IN (SELECT `id` FROM `modes` WHERE pub = false)
-		// AND mode_id <> 0 ORDER BY id DESC LIMIT 21
-		subQuery := db.Model(&Mode{}).Select("id").Where("pub = ?", false)
-		query = query.Where("mode_id NOT IN (?)", subQuery).Where("mode_id <> 0")
+		err = queryTopicsPublic(&topics, urlquery.Offset)
+	} else {
+		err = queryTopics(&topics, urlquery.Offset)
 	}
-	err := query.Find(&topics).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
 	if len(topics) == 21 {
-		topics[20] = &Topic{Id: -1}
+		topics[20] = Topic{Id: -1}
 	}
 
 	responseSuccess(c, topics)
@@ -62,15 +63,13 @@ func getTopics(c *gin.Context) {
 func getModes(c *gin.Context) {
 	uid := c.MustGet("uid").(int)
 
-	var modes []*Mode
-
-	// SELECT * FROM `modes`
-	query := db
+	var modes []Mode
+	var err error
 	if uid == -1 {
-		// SELECT * FROM `modes` WHERE pub <> false
-		query = query.Where("pub <> ?", false)
+		err = queryModesPublic(&modes)
+	} else {
+		err = queryModes(&modes)
 	}
-	err := query.Find(&modes).Error
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
@@ -88,40 +87,46 @@ func getTopicAndPosts(c *gin.Context) {
 		return
 	}
 
-	var data struct {
-		Topic
-		Pub bool
+	topic := Topic{
+		Id: aid,
 	}
-
-	// SELECT topics.*, modes.pub FROM `topics` LEFT JOIN modes ON topics.mode_id = modes.id WHERE topics.id = 4
-	rs := db.Table("topics").Select("topics.*, modes.pub").
-		Joins("LEFT JOIN modes ON topics.mode_id = modes.id").
-		Where("topics.id = ?", aid).Scan(&data)
-	if rs.Error != nil {
-		responseError(c, rs.Error, 500, "server error")
-		return
-	}
-	if rs.RowsAffected == 0 {
-		responseError(c, errors.New("not found"), 404, "not found")
+	if err = topic.stat("id"); err != nil {
+		responseError(c, err, 404, "not found")
 		return
 	}
 
-	if uid == -1 && (data.Pub == false || data.Topic.ModeId == 0) {
-		responseError(c, errors.New("access denied"), 404, "not found")
-		return
+	err = queryTopicAndPostsOnTopic(&topic)
+	if err != nil {
+		responseError(c, err, 500, "server error")
 	}
 
-	topic := data.Topic
+	if uid == -1 {
+		if topic.ModeId == 0 {
+			responseError(c, errors.New("access denied"), 404, "not found")
+			return
+		}
+		mode := Mode{
+			Id: topic.ModeId,
+		}
+		err = mode.stat("pub")
+		if err != nil {
+			responseError(c, err, 500, "server error")
+			return
+		}
+		if mode.Pub == false {
+			responseError(c, errors.New("access denied"), 404, "not found")
+			return
+		}
+	}
+
 	var posts []Post
-
-	// SELECT * FROM `posts` WHERE topic_id = 4 ORDER BY floor
-	err = db.Order("floor").Where("topic_id = ?", topic.Id).Find(&posts).Error
+	err = queryTopicAndPostsOnPosts(&posts, aid)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
-	responseSuccess(c, resource{
+	responseSuccess(c, avData{
 		Topic: topic,
 		Posts: posts,
 	})
@@ -145,38 +150,37 @@ func getTopicsByMode(c *gin.Context) {
 	mode := Mode{
 		Id: cid,
 	}
-	if err = mode.verifyExist(); err != nil {
+	if err = mode.stat("pub"); err != nil {
 		responseError(c, err, 404, "not found")
 		return
 	}
-
 	if uid == -1 {
-		pub, err := mode.queryPublic()
-		if err != nil {
-			responseError(c, err, 500, "server error")
-			return
-		}
-		if pub == false {
+		if mode.Pub == false {
 			responseError(c, errors.New("access denied"), 404, "not found")
 			return
 		}
 	}
 
-	var topics []*Topic
+	err = queryTopicsByModeOnMode(&mode)
+	if err != nil {
+		responseError(c, err, 500, "server error")
+	}
 
-	// SELECT * FROM `topics` WHERE mode_id = 1 ORDER BY id DESC LIMIT 21
-	err = db.Order("id DESC").Offset(urlquery.Offset).Limit(21).
-		Where("mode_id = ?", cid).Find(&topics).Error
+	var topics []Topic
+	err = queryTopicsByModeOnTopics(&topics, cid, urlquery.Offset)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
 	if len(topics) == 21 {
-		topics[20] = &Topic{Id: -1}
+		topics[20] = Topic{Id: -1}
 	}
 
-	responseSuccess(c, topics)
+	responseSuccess(c, cvData{
+		Mode:   mode,
+		Topics: topics,
+	})
 }
 
 // api/cv/create
@@ -287,7 +291,7 @@ func createTopic(c *gin.Context) {
 		return
 	}
 
-	responseSuccess(c, resource{
+	responseSuccess(c, avData{
 		Topic: obj,
 		Posts: []Post{data},
 	})
@@ -543,4 +547,38 @@ func coreUpdate(obj core, data interface{}) error {
 
 func coreDelete(obj core) error {
 	return obj.delete()
+}
+
+func queryTopics(dest *[]Topic, offset int) error {
+	return db.Order("id DESC").Offset(offset).Limit(21).Find(dest).Error
+}
+
+func queryTopicsPublic(dest *[]Topic, offset int) error {
+	subQuery := db.Model(&Mode{}).Select("id").Where("pub = ?", true)
+	return db.Order("id DESC").Offset(offset).Limit(21).
+		Where("mode_id IN (?)", subQuery).Where("mode_id <> 0").Find(dest).Error
+}
+
+func queryModes(dest *[]Mode) error {
+	return db.Find(dest).Error
+}
+
+func queryModesPublic(dest *[]Mode) error {
+	return db.Where("pub = ?", true).Find(dest).Error
+}
+
+func queryTopicAndPostsOnTopic(dest *Topic) error {
+	return db.Model(dest).Where("id = ?", dest.Id).Take(dest).Error
+}
+
+func queryTopicAndPostsOnPosts(dest *[]Post, aid int) error {
+	return db.Order("floor").Where("topic_id = ?", aid).Find(dest).Error
+}
+
+func queryTopicsByModeOnMode(dest *Mode) error {
+	return db.Model(dest).Where("id = ?", dest.Id).Take(dest).Error
+}
+
+func queryTopicsByModeOnTopics(dest *[]Topic, cid int, offset int) error {
+	return db.Order("id DESC").Offset(offset).Limit(21).Where("mode_id = ?", cid).Find(dest).Error
 }

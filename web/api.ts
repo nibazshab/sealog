@@ -28,9 +28,14 @@ interface Result<T> {
     data?: T
 }
 
-interface Resource {
+interface AvData {
     topic: Topic
     posts: Post[]
+}
+
+interface CvData {
+    mode: Mode
+    topics: Topic[]
 }
 
 const req = axios.create({
@@ -65,14 +70,14 @@ export const getCvs = (): Promise<Result<Mode[]>> => {
 
 export const getAv = (
     aid: string
-): Promise<Result<Resource>> => {
+): Promise<Result<AvData>> => {
     return req.get("/av/" + aid)
 }
 
 export const getAvsByCv = (
     cid: string,
     offset?: number
-): Promise<Result<Topic[]>> => {
+): Promise<Result<CvData>> => {
     return req.get("/cv/" + cid, {
         params: offset != null ? {offset} : undefined
     })
@@ -112,7 +117,7 @@ export const createAv = (
     title: string,
     mode_id: number,
     content: string
-): Promise<Result<Resource>> => {
+): Promise<Result<AvData>> => {
     return req.post("/av/create", {
         title,
         mode_id,

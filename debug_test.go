@@ -190,3 +190,25 @@ func TestDelPost(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestTopic_stat(t *testing.T) {
+	a := Topic{
+		Id: 1,
+	}
+
+	err := a.stat("id")
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestMode_stat(t *testing.T) {
+	mode := Mode{
+		Id: 1,
+	}
+
+	err := mode.stat("pub")
+	if err != nil {
+		t.Error(err)
+	}
+}

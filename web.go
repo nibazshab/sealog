@@ -25,20 +25,19 @@ func static(s *gin.RouterGroup) {
 		c.Data(200, "image/x-icon", []byte{})
 	})
 
-	dist, err := fs.Sub(web, "dist")
-	if err != nil {
-		log.Fatalln("error:", err)
-	}
-	assets, err := fs.Sub(dist, "assets")
+	assets, err := fs.Sub(web, "dist/assets")
 	if err != nil {
 		log.Fatalln("error:", err)
 	}
 
 	s.StaticFS("/assets/", http.FS(assets))
-
-	s.GET("/", func(c *gin.Context) {
-		c.FileFromFS("/", http.FS(dist))
-	})
 }
 
-// todo 页面如何生成呢？应当支持 SEO 并且能使用 JSON api 获取数据，不能纯 SPA
+// todo 暂定 SPA，url 页面组装完整 html 返回，其余页面由 js 替换页面组件实现
+func renderHtml(r *gin.Engine) {
+	r.GET("/", func(c *gin.Context) {})
+	r.GET("/av", func(c *gin.Context) {})
+	r.GET("/cv", func(c *gin.Context) {})
+	r.GET("/av/:aid", func(c *gin.Context) {})
+	r.GET("/cv/:cid", func(c *gin.Context) {})
+}

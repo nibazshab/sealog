@@ -44,7 +44,6 @@ func initializeAuth() {
 func getAuthHash() (string, error) {
 	var a Auth
 
-	// SELECT * FROM `auths` ORDER BY `auths`.`id` DESC LIMIT 1
 	err := db.Last(&a).Error
 	return a.Hash, err
 }
@@ -59,7 +58,6 @@ func addAuthHash(str string) error {
 		Hash: hash,
 	}
 
-	// INSERT INTO `auths` (`hash`) VALUES ("$2a$10$zqars0w5SAkRBDPnhrBEses1lmy15hfKkGZfO21jx/mi959v3aEfq") RETURNING `id`
 	return db.Create(&a).Error
 }
 
@@ -111,7 +109,6 @@ func initializeHmac() {
 func getHmacKey() (string, error) {
 	var h Hmac
 
-	// SELECT * FROM `hmacs` ORDER BY `hmacs`.`id` DESC LIMIT 1
 	err := db.Last(&h).Error
 	return h.Key, err
 }
@@ -123,7 +120,6 @@ func addHmacKey() error {
 		Key: base64.RawURLEncoding.EncodeToString(hmacKey),
 	}
 
-	// INSERT INTO `hmacs` (`key`) VALUES ("Qk7WIJ70b4Xds6S5L944pU8DmUSYxx5EXojyTRV9S7I") RETURNING `id`
 	return db.Create(&h).Error
 }
 

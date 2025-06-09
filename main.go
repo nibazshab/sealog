@@ -114,7 +114,7 @@ func commandExecute(cfg *config) {
 
 	default:
 		fmt.Println("unknown", os.Args[1])
-		os.Exit(0)
+		os.Exit(1)
 	}
 }
 
@@ -177,6 +177,8 @@ func initializeRouter(r *gin.Engine) {
 
 	s := r.Group("/")
 	static(s)
+
+	renderHtml(r)
 }
 
 func corsMiddleware() gin.HandlerFunc {
