@@ -41,19 +41,10 @@ func getTopics(c *gin.Context) {
 	}
 
 	var topics []Topic
-	var err error
-	if uid == -1 {
-		err = queryTopicsPublic(&topics, urlquery.Offset)
-	} else {
-		err = queryTopics(&topics, urlquery.Offset)
-	}
+	err := queryTopics(&topics, uid, urlquery.Offset)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
-	}
-
-	if len(topics) == 21 {
-		topics[20] = Topic{Id: -1}
 	}
 
 	responseSuccess(c, topics)
@@ -64,12 +55,7 @@ func getModes(c *gin.Context) {
 	uid := c.MustGet("uid").(int)
 
 	var modes []Mode
-	var err error
-	if uid == -1 {
-		err = queryModesPublic(&modes)
-	} else {
-		err = queryModes(&modes)
-	}
+	err := queryModes(&modes, uid)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
@@ -87,49 +73,14 @@ func getTopicAndPosts(c *gin.Context) {
 		return
 	}
 
-	topic := Topic{
-		Id: aid,
-	}
-	if err = topic.stat("id"); err != nil {
-		responseError(c, err, 404, "not found")
+	var av avData
+	err, code, msg := queryTopicAndPosts(&av, uid, aid)
+	if err != nil {
+		responseError(c, err, code, msg)
 		return
 	}
 
-	err = queryTopicAndPostsOnTopic(&topic)
-	if err != nil {
-		responseError(c, err, 500, "server error")
-	}
-
-	if uid == -1 {
-		if topic.ModeId == 0 {
-			responseError(c, errors.New("access denied"), 404, "not found")
-			return
-		}
-		mode := Mode{
-			Id: topic.ModeId,
-		}
-		err = mode.stat("pub")
-		if err != nil {
-			responseError(c, err, 500, "server error")
-			return
-		}
-		if mode.Pub == false {
-			responseError(c, errors.New("access denied"), 404, "not found")
-			return
-		}
-	}
-
-	var posts []Post
-	err = queryTopicAndPostsOnPosts(&posts, aid)
-	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
-	}
-
-	responseSuccess(c, avData{
-		Topic: topic,
-		Posts: posts,
-	})
+	responseSuccess(c, av)
 }
 
 // api/cv/:cid
@@ -147,40 +98,120 @@ func getTopicsByMode(c *gin.Context) {
 		urlquery.Offset = 0
 	}
 
-	mode := Mode{
-		Id: cid,
-	}
-	if err = mode.stat("pub"); err != nil {
-		responseError(c, err, 404, "not found")
+	var cv cvData
+	err, code, msg := queryTopicsByMode(&cv, uid, cid, urlquery.Offset)
+	if err != nil {
+		responseError(c, err, code, msg)
 		return
 	}
+
+	responseSuccess(c, cv)
+}
+
+func queryTopics(dest *[]Topic, uid int, offset int) error {
+	var err error
 	if uid == -1 {
+		subQuery := db.Model(&Mode{}).Select("id").Where("pub = ?", true)
+		err = db.Order("id DESC").Offset(offset).Limit(21).
+			Where("mode_id IN (?)", subQuery).Where("mode_id <> 0").Find(dest).Error
+	} else {
+		err = db.Order("id DESC").Offset(offset).Limit(21).Find(dest).Error
+	}
+	if err != nil {
+		return err
+	}
+
+	if len(*dest) == 21 {
+		(*dest)[20] = Topic{Id: -1}
+	}
+
+	return nil
+}
+
+func queryModes(dest *[]Mode, uid int) error {
+	var err error
+	if uid == -1 {
+		err = db.Where("pub = ?", true).Find(dest).Error
+	} else {
+		err = db.Find(dest).Error
+	}
+
+	return err
+}
+
+func queryTopicAndPosts(dest *avData, uid int, aid int) (error, int, string) {
+	topic := Topic{
+		Id: aid,
+	}
+	err := topic.stat("id")
+	if err != nil {
+		return err, 404, "not found"
+	}
+
+	err = db.Model(&topic).Where("id = ?", aid).Take(&topic).Error
+	if err != nil {
+		return err, 500, "server error"
+	}
+
+	if uid == -1 {
+		if topic.ModeId == 0 {
+			return errors.New("access denied"), 404, "not found"
+		}
+		mode := Mode{
+			Id: topic.ModeId,
+		}
+		err = mode.stat("pub")
+		if err != nil {
+			return err, 500, "server error"
+		}
 		if mode.Pub == false {
-			responseError(c, errors.New("access denied"), 404, "not found")
-			return
+			return errors.New("access denied"), 404, "not found"
 		}
 	}
 
-	err = queryTopicsByModeOnMode(&mode)
+	var posts []Post
+	err = db.Order("floor").Where("topic_id = ?", aid).Find(&posts).Error
 	if err != nil {
-		responseError(c, err, 500, "server error")
+		return err, 500, "server error"
+	}
+
+	dest.Topic = topic
+	dest.Posts = posts
+
+	return nil, 200, ""
+}
+
+func queryTopicsByMode(dest *cvData, uid int, cid int, offset int) (error, int, string) {
+	mode := Mode{
+		Id: cid,
+	}
+	err := mode.stat("pub")
+	if err != nil {
+		return err, 404, "not found"
+	}
+	if uid == -1 && mode.Pub == false {
+		return errors.New("access denied"), 404, "not found"
+	}
+
+	err = db.Model(&mode).Where("id = ?", cid).Take(&mode).Error
+	if err != nil {
+		return err, 500, "server error"
 	}
 
 	var topics []Topic
-	err = queryTopicsByModeOnTopics(&topics, cid, urlquery.Offset)
+	err = db.Order("id DESC").Offset(offset).Limit(21).Where("mode_id = ?", cid).Find(&topics).Error
 	if err != nil {
-		responseError(c, err, 500, "server error")
-		return
+		return err, 500, "server error"
 	}
 
 	if len(topics) == 21 {
 		topics[20] = Topic{Id: -1}
 	}
 
-	responseSuccess(c, cvData{
-		Mode:   mode,
-		Topics: topics,
-	})
+	dest.Mode = mode
+	dest.Topics = topics
+
+	return nil, 200, ""
 }
 
 // api/cv/create
@@ -547,38 +578,4 @@ func coreUpdate(obj core, data interface{}) error {
 
 func coreDelete(obj core) error {
 	return obj.delete()
-}
-
-func queryTopics(dest *[]Topic, offset int) error {
-	return db.Order("id DESC").Offset(offset).Limit(21).Find(dest).Error
-}
-
-func queryTopicsPublic(dest *[]Topic, offset int) error {
-	subQuery := db.Model(&Mode{}).Select("id").Where("pub = ?", true)
-	return db.Order("id DESC").Offset(offset).Limit(21).
-		Where("mode_id IN (?)", subQuery).Where("mode_id <> 0").Find(dest).Error
-}
-
-func queryModes(dest *[]Mode) error {
-	return db.Find(dest).Error
-}
-
-func queryModesPublic(dest *[]Mode) error {
-	return db.Where("pub = ?", true).Find(dest).Error
-}
-
-func queryTopicAndPostsOnTopic(dest *Topic) error {
-	return db.Model(dest).Where("id = ?", dest.Id).Take(dest).Error
-}
-
-func queryTopicAndPostsOnPosts(dest *[]Post, aid int) error {
-	return db.Order("floor").Where("topic_id = ?", aid).Find(dest).Error
-}
-
-func queryTopicsByModeOnMode(dest *Mode) error {
-	return db.Model(dest).Where("id = ?", dest.Id).Take(dest).Error
-}
-
-func queryTopicsByModeOnTopics(dest *[]Topic, cid int, offset int) error {
-	return db.Order("id DESC").Offset(offset).Limit(21).Where("mode_id = ?", cid).Find(dest).Error
 }

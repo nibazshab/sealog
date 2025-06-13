@@ -176,9 +176,12 @@ func initializeRouter(r *gin.Engine) {
 	fl.POST("/delete", deletePost)
 
 	s := r.Group("/")
+	s.Use(cacheMiddleware())
 	static(s)
 
-	renderHtml(r)
+	h := r.Group("/")
+	h.Use(authMiddleware())
+	renderHtml(h)
 }
 
 func corsMiddleware() gin.HandlerFunc {

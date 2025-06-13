@@ -2,9 +2,11 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,11 +14,13 @@ import (
 //go:embed all:dist
 var web embed.FS
 
-func static(s *gin.RouterGroup) {
-	s.Use(func(c *gin.Context) {
+func cacheMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
 		c.Header("Cache-Control", "public, max-age=2592000")
-	})
+	}
+}
 
+func static(s *gin.RouterGroup) {
 	s.GET("/robots.txt", func(c *gin.Context) {
 		c.Data(200, "text/plain", []byte("User-agent: *\nAllow: /"))
 	})
@@ -34,10 +38,16 @@ func static(s *gin.RouterGroup) {
 }
 
 // todo 暂定 SPA，url 页面组装完整 html 返回，其余页面由 js 替换页面组件实现
-func renderHtml(r *gin.Engine) {
-	r.GET("/", func(c *gin.Context) {})
-	r.GET("/av", func(c *gin.Context) {})
-	r.GET("/cv", func(c *gin.Context) {})
-	r.GET("/av/:aid", func(c *gin.Context) {})
-	r.GET("/cv/:cid", func(c *gin.Context) {})
+func renderHtml(h *gin.RouterGroup) {
+	h.GET("/", func(c *gin.Context) {})
+	h.GET("/av", func(c *gin.Context) {})
+	h.GET("/cv", func(c *gin.Context) {})
+	h.GET("/av/:aid", func(c *gin.Context) {})
+	h.GET("/cv/:cid", func(c *gin.Context) {
+		uid := c.MustGet("uid").(int)
+		cid, _ := strconv.Atoi(c.Param("cid"))
+		var cv cvData
+		queryTopicsByMode(&cv, uid, cid, 0)
+		fmt.Println(cv)
+	})
 }
