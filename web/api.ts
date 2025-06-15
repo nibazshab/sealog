@@ -28,12 +28,12 @@ interface Result<T> {
     data?: T
 }
 
-interface AvData {
+interface ResAid {
     topic: Topic
     posts: Post[]
 }
 
-interface CvData {
+interface ResCid {
     mode: Mode
     topics: Topic[]
 }
@@ -56,7 +56,15 @@ req.interceptors.request.use(config => {
 
 req.interceptors.response.use(response => response.data)
 
-export const getAvs = (
+export const search = (
+    q: string
+): Result<Topic> => {
+    return req.get("/search", {
+        params: {q}
+    })
+}
+
+export const reqAv = (
     offset?: number
 ): Promise<Result<Topic[]>> => {
     return req.get("/av", {
@@ -64,20 +72,20 @@ export const getAvs = (
     })
 }
 
-export const getCvs = (): Promise<Result<Mode[]>> => {
+export const reqCv = (): Promise<Result<Mode[]>> => {
     return req.get("/cv")
 }
 
-export const getAv = (
+export const reqAid = (
     aid: string
-): Promise<Result<AvData>> => {
+): Promise<Result<ResAid>> => {
     return req.get("/av/" + aid)
 }
 
-export const getAvsByCv = (
+export const reqCid = (
     cid: string,
     offset?: number
-): Promise<Result<CvData>> => {
+): Promise<Result<ResCid>> => {
     return req.get("/cv/" + cid, {
         params: offset != null ? {offset} : undefined
     })
@@ -117,7 +125,7 @@ export const createAv = (
     title: string,
     mode_id: number,
     content: string
-): Promise<Result<AvData>> => {
+): Promise<Result<ResAid>> => {
     return req.post("/av/create", {
         title,
         mode_id,
@@ -177,14 +185,14 @@ export const updateFl = (
     })
 }
 
-export const getUid = (): Promise<Result<number>> => {
-    return req.get("/uid")
+export const reqSpace = (): Promise<Result<boolean>> => {
+    return req.get("/space")
 }
 
-export const loginAuth = (
+export const login = (
     password: string
 ): Promise<Result<string>> => {
-    return req.post("/auth/login", {
+    return req.post("/login", {
         password
     })
 }

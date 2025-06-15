@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"reflect"
 	"time"
 
 	"gorm.io/gorm"
@@ -10,9 +11,9 @@ import (
 type (
 	// Mode 帖子版块
 	Mode struct {
-		Id   int    `gorm:"primaryKey" json:"id"`
-		Name string `gorm:"not null"   json:"name"`
-		Pub  bool   `                  json:"pub"`
+		Id   int    `gorm:"primaryKey"    json:"id"`
+		Name string `gorm:"not null"      json:"name"`
+		Pub  bool   `gorm:"default:false" json:"pub"`
 	}
 
 	// Topic 帖子主题
@@ -21,7 +22,7 @@ type (
 		CreatedAt time.Time `gorm:"autoCreateTime"  json:"created_at"`
 		Title     string    `gorm:"not null"        json:"title"`
 		ModeId    int       `gorm:"index;default:0" json:"mode_id"`
-		Floors    int       `gorm:"default:1"       json:"-"`
+		Floors    int       `gorm:"default:0"       json:"-"`
 	}
 
 	// Post 帖子楼层
@@ -35,7 +36,7 @@ type (
 )
 
 // m.Name, m.Pub
-func (m *Mode) create(interface{}) error {
+func (m *Mode) create() error {
 	return db.Create(m).Error
 }
 
@@ -50,35 +51,14 @@ func (m *Mode) BeforeDelete(tx *gorm.DB) error {
 }
 
 // m.Id
-// m.Id, m.Name, m.Pub
+// *m.Name, *m.Pub
 func (m *Mode) update(data interface{}) error {
-	return db.Set("data", data).
-		Model(m).Where("id = ?", m.Id).Updates(data).Error
-}
-
-func (m *Mode) BeforeUpdate(tx *gorm.DB) error {
-	if !tx.Statement.Changed("id") {
-		return nil
-	}
-
-	data, ok := tx.Get("data")
-	if !ok {
-		return errors.New("no data")
-	}
-	mode, ok := data.(*Mode)
-	if !ok {
-		return errors.New("not mode")
-	}
-
-	return tx.Model(&Topic{}).Session(&gorm.Session{SkipHooks: true}).
-		Where("mode_id = ?", m.Id).Update("mode_id", mode.Id).Error
+	return db.Model(m).Where("id = ?", m.Id).Omit("id").Updates(data).Error
 }
 
 // t.Title, t.ModeId
-// p.Content
-func (t *Topic) create(data interface{}) error {
-	return db.Set("data", data).
-		Create(t).Error
+func (t *Topic) create() error {
+	return db.Create(t).Error
 }
 
 func (t *Topic) BeforeCreate(*gorm.DB) error {
@@ -86,23 +66,6 @@ func (t *Topic) BeforeCreate(*gorm.DB) error {
 		Id: t.ModeId,
 	}
 	return mode.stat("id")
-}
-
-func (t *Topic) AfterCreate(tx *gorm.DB) error {
-	data, ok := tx.Get("data")
-	if !ok {
-		return errors.New("no data")
-	}
-	post, ok := data.(*Post)
-	if !ok {
-		return errors.New("not post")
-	}
-
-	post.TopicId = t.Id
-	post.Floor = 1
-
-	return tx.Model(&Post{}).Session(&gorm.Session{SkipHooks: true}).
-		Create(post).Error
 }
 
 // t.Id
@@ -115,34 +78,46 @@ func (t *Topic) BeforeDelete(tx *gorm.DB) error {
 }
 
 // t.Id
-// t.Title, t.ModeId
+// *t.Title, *t.ModeId
 func (t *Topic) update(data interface{}) error {
-	return db.Set("data", data).
-		Model(t).Where("id = ?", t.Id).Omit("id", "floors").Updates(data).Error
+	return db.Model(t).Where("id = ?", t.Id).Omit("id", "floors").Updates(data).Error
 }
 
 func (t *Topic) BeforeUpdate(tx *gorm.DB) error {
-	if !tx.Statement.Changed("mode_id") {
-		return nil
+	val := reflect.ValueOf(tx.Statement.Dest)
+	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return nil
+		}
+		val = val.Elem()
+	}
+	if val.Kind() != reflect.Struct {
+		return errors.New("not struct")
 	}
 
-	data, ok := tx.Get("data")
-	if !ok {
-		return errors.New("no data")
+	mid := val.FieldByName("ModeId")
+	if !mid.IsValid() {
+		return errors.New("no mode_id")
 	}
-	topic, ok := data.(*Topic)
-	if !ok {
-		return errors.New("not topic")
+
+	if mid.Kind() == reflect.Ptr {
+		if mid.IsNil() {
+			return nil
+		}
+		mid = mid.Elem()
+	}
+	if mid.Kind() != reflect.Int {
+		return errors.New("not mode_id")
 	}
 
 	mode := Mode{
-		Id: topic.ModeId,
+		Id: int(mid.Int()),
 	}
 	return mode.stat("id")
 }
 
 // p.TopicId, p.Content
-func (p *Post) create(interface{}) error {
+func (p *Post) create() error {
 	topic := Topic{
 		Id: p.TopicId,
 	}
@@ -153,22 +128,18 @@ func (p *Post) create(interface{}) error {
 
 	p.Floor = topic.Floors + 1
 
-	return db.Set("data", &topic).
+	return db.Set("topic_id", p.TopicId).
 		Create(p).Error
 }
 
 func (p *Post) AfterCreate(tx *gorm.DB) error {
-	data, ok := tx.Get("data")
+	tid, ok := tx.Get("topic_id")
 	if !ok {
-		return errors.New("no data")
-	}
-	topic, ok := data.(*Topic)
-	if !ok {
-		return errors.New("not topic")
+		return errors.New("no topic_id")
 	}
 
 	return tx.Model(&Topic{}).Session(&gorm.Session{SkipHooks: true}).
-		Where("id = ?", topic.Id).Update("floors", gorm.Expr("floors + 1")).Error
+		Where("id = ?", tid).Update("floors", gorm.Expr("floors + 1")).Error
 }
 
 // p.TopicId, p.Floor

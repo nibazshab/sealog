@@ -37,7 +37,7 @@ func TestNewMode(t *testing.T) {
 			Pub:  rand.Intn(2) == 1,
 		}
 
-		if err := mode.create(nil); err != nil {
+		if err := mode.create(); err != nil {
 			t.Error(err)
 		}
 	}
@@ -64,11 +64,7 @@ func TestNewTopic(t *testing.T) {
 			ModeId: rand.Intn(10) + 1,
 		}
 
-		post := Post{
-			Content: string(b),
-		}
-
-		if err := topic.create(&post); err != nil {
+		if err := topic.create(); err != nil {
 			t.Error(err)
 		}
 	}
@@ -95,7 +91,7 @@ func TestNewPost(t *testing.T) {
 			Content: string(b),
 		}
 
-		if err := post.create(nil); err != nil {
+		if err := post.create(); err != nil {
 			t.Error(err)
 		}
 	}
@@ -114,12 +110,18 @@ func TestUpMode(t *testing.T) {
 		Id: 1,
 	}
 
-	new1 := Mode{
-		Id:   3,
-		Name: "dd",
+	pub := false
+	a := struct {
+		Id   int
+		Name *string
+		Pub  *bool
+	}{
+		Id:   mode.Id,
+		Name: nil,
+		Pub:  &pub,
 	}
 
-	err := mode.update(&new1)
+	err := mode.update(a)
 	if err != nil {
 		t.Error(err)
 	}
@@ -130,12 +132,25 @@ func TestUpTopic(t *testing.T) {
 		Id: 99,
 	}
 
-	b := Topic{
-		// ModeId: 2,
-		Title: "c99",
+	id := 1
+	title := "c99"
+	b1 := struct {
+		ModeId *int
+		Title  *string
+	}{
+		ModeId: &id,
+		Title:  &title,
 	}
-
-	err := topic.update(&b)
+	b2 := Topic{
+		ModeId: id,
+		Title:  title,
+	}
+	b3 := map[string]interface{}{
+		"mode_id": id,
+		"title":   title,
+	}
+	_, _, _ = b1, b2, b3
+	err := topic.update(b1)
 	if err != nil {
 		t.Error(err)
 	}
@@ -151,7 +166,7 @@ func TestUpPost(t *testing.T) {
 		Content: "",
 	}
 
-	err := p.update(&b)
+	err := p.update(b)
 	if err != nil {
 		t.Error(err)
 	}
