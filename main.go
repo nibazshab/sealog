@@ -148,17 +148,18 @@ func initializeRouter(r *gin.Engine) {
 	api := r.Group("/api")
 	api.Use(authMiddleware())
 
+	api.GET("/search", getTopicsBySearch)
 	api.GET("/av", getTopics)
 	api.GET("/cv", getModes)
 	api.GET("/av/:aid", getTopicAndPosts)
 	api.GET("/cv/:cid", getTopicsByMode)
-	api.GET("/uid", getAuthUid)
-	api.POST("/auth/login", loginAuth)
+	api.GET("/space", getAuthStat)
+	api.POST("/login", verifyAuthKey)
 
 	api.Use(protectMiddleware())
 
 	auth := api.Group("/auth")
-	auth.POST("/change", changeAuth)
+	auth.POST("/change", changeAuthKey)
 
 	cv := api.Group("/cv")
 	cv.POST("/create", createMode)

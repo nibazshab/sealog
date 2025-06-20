@@ -46,8 +46,8 @@ func renderHtml(h *gin.RouterGroup) {
 	h.GET("/cv/:cid", func(c *gin.Context) {
 		uid := c.MustGet("uid").(int)
 		cid, _ := strconv.Atoi(c.Param("cid"))
-		var cv cvData
-		queryTopicsByMode(&cv, uid, cid, 0)
+		var cv resCid
+		_, _, _ = queryTopicsByMode(&cv, uid, cid, 0)
 		fmt.Println(cv)
 	})
 }

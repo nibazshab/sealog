@@ -13,18 +13,15 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	ex, _ := os.Executable()
-	db, _ = gorm.Open(sqlite.Open(filepath.Join(filepath.Dir(ex), "test.db")))
+	db, _ = gorm.Open(sqlite.Open(filepath.Join(os.TempDir(), "test.db")))
 	db.TranslateError = true
 	db.Logger = logger.Default.LogMode(logger.Info)
 
-	db.AutoMigrate(&Mode{}, &Topic{}, &Post{})
-
-	println(ex)
+	_ = db.AutoMigrate(&Mode{}, &Topic{}, &Post{})
 	m.Run()
 }
 
-func TestNewMode(t *testing.T) {
+func TestMode_create(t *testing.T) {
 	fn := func(t *testing.T) {
 		const letters = "abcdefghijklmnopqrstuvwxyz"
 		b := make([]byte, 5)
@@ -37,7 +34,7 @@ func TestNewMode(t *testing.T) {
 			Pub:  rand.Intn(2) == 1,
 		}
 
-		if err := mode.create(nil); err != nil {
+		if err := mode.create(); err != nil {
 			t.Error(err)
 		}
 	}
@@ -51,7 +48,7 @@ func TestNewMode(t *testing.T) {
 	}
 }
 
-func TestNewTopic(t *testing.T) {
+func TestTopic_create(t *testing.T) {
 	fn := func(t *testing.T) {
 		const letters = "abcdefghijklmnopqrstuvwxyz"
 		b := make([]byte, 10)
@@ -64,11 +61,7 @@ func TestNewTopic(t *testing.T) {
 			ModeId: rand.Intn(10) + 1,
 		}
 
-		post := Post{
-			Content: string(b),
-		}
-
-		if err := topic.create(&post); err != nil {
+		if err := topic.create(); err != nil {
 			t.Error(err)
 		}
 	}
@@ -82,7 +75,7 @@ func TestNewTopic(t *testing.T) {
 	}
 }
 
-func TestNewPost(t *testing.T) {
+func TestPost_create(t *testing.T) {
 	fn := func(t *testing.T) {
 		const letters = "abcdefghijklmnopqrstuvwxyz"
 		b := make([]byte, 10)
@@ -95,7 +88,7 @@ func TestNewPost(t *testing.T) {
 			Content: string(b),
 		}
 
-		if err := post.create(nil); err != nil {
+		if err := post.create(); err != nil {
 			t.Error(err)
 		}
 	}
@@ -109,40 +102,51 @@ func TestNewPost(t *testing.T) {
 	}
 }
 
-func TestUpMode(t *testing.T) {
+func TestMode_update(t *testing.T) {
 	mode := Mode{
 		Id: 1,
 	}
 
-	new1 := Mode{
-		Id:   3,
-		Name: "dd",
+	b := struct {
+		Name *string
+		Pub  *bool
+	}{
+		Name: nil,
+		Pub:  ref(true),
 	}
 
-	err := mode.update(&new1)
+	err := mode.update(b)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
-func TestUpTopic(t *testing.T) {
+func TestTopic_update(t *testing.T) {
 	topic := Topic{
 		Id: 99,
 	}
 
-	b := Topic{
-		// ModeId: 2,
-		Title: "c99",
+	b1 := struct {
+		ModeId *int
+		Title  *string
+	}{
+		ModeId: ref(1),
+		Title:  ref("test"),
+	}
+	b2 := map[string]interface{}{
+		"mode_id": ref(1),
+		"title":   ref("test"),
 	}
 
-	err := topic.update(&b)
+	_, _ = b1, b2
+	err := topic.update(b1)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
-func TestUpPost(t *testing.T) {
-	p := Post{
+func TestPost_update(t *testing.T) {
+	post := Post{
 		TopicId: 1,
 		Floor:   2,
 	}
@@ -151,13 +155,13 @@ func TestUpPost(t *testing.T) {
 		Content: "",
 	}
 
-	err := p.update(&b)
+	err := post.update(b)
 	if err != nil {
 		t.Error(err)
 	}
 }
 
-func TestDelMode(t *testing.T) {
+func TestMode_delete(t *testing.T) {
 	mode := Mode{
 		Id: 1,
 	}
@@ -168,7 +172,7 @@ func TestDelMode(t *testing.T) {
 	}
 }
 
-func TestDelTopic(t *testing.T) {
+func TestTopic_delete(t *testing.T) {
 	topic := Topic{
 		Id: 92,
 	}
@@ -179,13 +183,24 @@ func TestDelTopic(t *testing.T) {
 	}
 }
 
-func TestDelPost(t *testing.T) {
-	p := Post{
+func TestPost_delete(t *testing.T) {
+	post := Post{
 		TopicId: 2,
 		Floor:   1,
 	}
 
-	err := p.delete()
+	err := post.delete()
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestMode_stat(t *testing.T) {
+	mode := Mode{
+		Id: 1,
+	}
+
+	err := mode.stat("pub")
 	if err != nil {
 		t.Error(err)
 	}
@@ -202,13 +217,6 @@ func TestTopic_stat(t *testing.T) {
 	}
 }
 
-func TestMode_stat(t *testing.T) {
-	mode := Mode{
-		Id: 1,
-	}
-
-	err := mode.stat("pub")
-	if err != nil {
-		t.Error(err)
-	}
+func ref[T any](x T) *T {
+	return &x
 }

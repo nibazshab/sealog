@@ -4,6 +4,8 @@ import (
 	"errors"
 	"log"
 	"strconv"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,20 +16,48 @@ type result[T any] struct {
 	Data T      `json:"data,omitempty"`
 }
 
-type avData struct {
-	Topic Topic  `json:"topic"`
-	Posts []Post `json:"posts"`
-}
+type (
+	resAid struct {
+		Topic Topic  `json:"topic"`
+		Posts []Post `json:"posts"`
+	}
 
-type cvData struct {
-	Mode   Mode    `json:"mode"`
-	Topics []Topic `json:"topics"`
-}
+	resCid struct {
+		Mode   Mode    `json:"mode"`
+		Topics []Topic `json:"topics"`
+	}
+)
 
 type core interface {
-	create(interface{}) error
+	create() error
 	update(interface{}) error
 	delete() error
+}
+
+// api/search
+func getTopicsBySearch(c *gin.Context) {
+	uid := c.MustGet("uid").(int)
+	var urlquery struct {
+		Q string `form:"q"`
+	}
+	if err := c.ShouldBindQuery(&urlquery); err != nil {
+		responseError(c, err, 400, "payload error")
+		return
+	}
+	urlquery.Q = strings.TrimSpace(urlquery.Q)
+	if utf8.RuneCountInString(urlquery.Q) < 3 {
+		responseError(c, errors.New("too few characters"), 400, "too few characters")
+		return
+	}
+
+	var topics []Topic
+	err, code, msg := queryTopicsBySearch(&topics, uid, urlquery.Q)
+	if err != nil {
+		responseError(c, err, code, msg)
+		return
+	}
+
+	responseSuccess(c, topics)
 }
 
 // api/av
@@ -73,14 +103,14 @@ func getTopicAndPosts(c *gin.Context) {
 		return
 	}
 
-	var av avData
-	err, code, msg := queryTopicAndPosts(&av, uid, aid)
+	var res resAid
+	err, code, msg := queryTopicAndPosts(&res, uid, aid)
 	if err != nil {
 		responseError(c, err, code, msg)
 		return
 	}
 
-	responseSuccess(c, av)
+	responseSuccess(c, res)
 }
 
 // api/cv/:cid
@@ -98,14 +128,50 @@ func getTopicsByMode(c *gin.Context) {
 		urlquery.Offset = 0
 	}
 
-	var cv cvData
-	err, code, msg := queryTopicsByMode(&cv, uid, cid, urlquery.Offset)
+	var res resCid
+	err, code, msg := queryTopicsByMode(&res, uid, cid, urlquery.Offset)
 	if err != nil {
 		responseError(c, err, code, msg)
 		return
 	}
 
-	responseSuccess(c, cv)
+	responseSuccess(c, res)
+}
+
+func queryTopicsBySearch(dest *[]Topic, uid int, chars string) (error, int, string) {
+	var idx []int
+	err := db.Model(&Post{}).Where("content LIKE ?", "%"+chars+"%").Select("topic_id").Scan(&idx).Error
+	if err != nil {
+		return err, 500, "server error"
+	}
+
+	if len(idx) == 0 {
+		dest = nil
+		return nil, 200, "success"
+	}
+
+	idy := make([]int, 0, len(idx))
+	f := make(map[int]bool)
+	for _, x := range idx {
+		if !f[x] {
+			f[x] = true
+			idy = append(idy, x)
+		}
+	}
+
+	if uid == -1 {
+		subQuery := db.Model(&Mode{}).Select("id").Where("pub = ?", true)
+		err = db.Order("id DESC").Where("id IN (?)", idy).
+			Where("mode_id IN (?)", subQuery).Where("mode_id <> 0").
+			Select("id", "title", "mode_id").Find(dest).Error
+	} else {
+		err = db.Order("id DESC").Where("id IN (?)", idy).Select("id", "title", "mode_id").Find(dest).Error
+	}
+	if err != nil {
+		return err, 500, "server error"
+	}
+
+	return nil, 200, "success"
 }
 
 func queryTopics(dest *[]Topic, uid int, offset int) error {
@@ -139,7 +205,7 @@ func queryModes(dest *[]Mode, uid int) error {
 	return err
 }
 
-func queryTopicAndPosts(dest *avData, uid int, aid int) (error, int, string) {
+func queryTopicAndPosts(dest *resAid, uid int, aid int) (error, int, string) {
 	topic := Topic{
 		Id: aid,
 	}
@@ -181,7 +247,7 @@ func queryTopicAndPosts(dest *avData, uid int, aid int) (error, int, string) {
 	return nil, 200, ""
 }
 
-func queryTopicsByMode(dest *cvData, uid int, cid int, offset int) (error, int, string) {
+func queryTopicsByMode(dest *resCid, uid int, cid int, offset int) (error, int, string) {
 	mode := Mode{
 		Id: cid,
 	}
@@ -230,7 +296,7 @@ func createMode(c *gin.Context) {
 		Pub:  payload.Pub,
 	}
 
-	err := coreCreate(&obj, nil)
+	err := coreCreate(&obj)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
@@ -265,16 +331,15 @@ func deleteMode(c *gin.Context) {
 // api/cv/update
 func updateMode(c *gin.Context) {
 	var payload struct {
-		Id   int    `json:"id" binding:"required"`
-		Name string `json:"name"`
-		Pub  bool   `json:"pub"`
+		Id   int     `json:"id" binding:"required"`
+		Name *string `json:"name"`
+		Pub  *bool   `json:"pub"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
 	}
-
-	if payload.Name == "" {
+	if payload.Name == nil && payload.Pub == nil {
 		responseError(c, errors.New("missing value"), 400, "payload error")
 		return
 	}
@@ -282,12 +347,8 @@ func updateMode(c *gin.Context) {
 	obj := Mode{
 		Id: payload.Id,
 	}
-	data := Mode{
-		Name: payload.Name,
-		Pub:  payload.Pub,
-	}
 
-	err := coreUpdate(&obj, &data)
+	err := coreUpdate(&obj, payload)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
@@ -312,17 +373,25 @@ func createTopic(c *gin.Context) {
 		Title:  payload.Title,
 		ModeId: payload.ModeId,
 	}
-	data := Post{
-		Content: payload.Content,
-	}
 
-	err := coreCreate(&obj, &data)
+	err := coreCreate(&obj)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
 	}
 
-	responseSuccess(c, avData{
+	data := Post{
+		TopicId: obj.Id,
+		Content: payload.Content,
+	}
+
+	err = coreCreate(&data)
+	if err != nil {
+		responseError(c, err, 500, "server error")
+		return
+	}
+
+	responseSuccess(c, resAid{
 		Topic: obj,
 		Posts: []Post{data},
 	})
@@ -354,16 +423,16 @@ func deleteTopic(c *gin.Context) {
 // api/av/update
 func updateTopic(c *gin.Context) {
 	var payload struct {
-		Id     int    `json:"id" binding:"required"`
-		Title  string `json:"title"`
-		ModeId int    `json:"mode_id"`
+		Id     int     `json:"id" binding:"required"`
+		Title  *string `json:"title"`
+		ModeId *int    `json:"mode_id"`
 	}
 	if err := c.ShouldBindJSON(&payload); err != nil {
 		responseError(c, err, 400, "payload error")
 		return
 	}
 
-	if payload.Title == "" && payload.ModeId == 0 {
+	if payload.Title == nil && payload.ModeId == nil {
 		responseError(c, errors.New("missing value"), 400, "payload error")
 		return
 	}
@@ -371,12 +440,8 @@ func updateTopic(c *gin.Context) {
 	obj := Topic{
 		Id: payload.Id,
 	}
-	data := Topic{
-		Title:  payload.Title,
-		ModeId: payload.ModeId,
-	}
 
-	err := coreUpdate(&obj, &data)
+	err := coreUpdate(&obj, payload)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
@@ -401,7 +466,7 @@ func createPost(c *gin.Context) {
 		Content: payload.Content,
 	}
 
-	err := coreCreate(&obj, nil)
+	err := coreCreate(&obj)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
@@ -451,11 +516,8 @@ func updatePost(c *gin.Context) {
 		TopicId: payload.TopicId,
 		Floor:   payload.Floor,
 	}
-	data := Post{
-		Content: payload.Content,
-	}
 
-	err := coreUpdate(&obj, &data)
+	err := coreUpdate(&obj, payload)
 	if err != nil {
 		responseError(c, err, 500, "server error")
 		return
@@ -464,15 +526,20 @@ func updatePost(c *gin.Context) {
 	responseSuccess(c, obj)
 }
 
-// api/uid
-func getAuthUid(c *gin.Context) {
+// api/space
+func getAuthStat(c *gin.Context) {
 	uid := c.MustGet("uid").(int)
+	var stat bool
 
-	responseSuccess(c, uid)
+	if uid == 1 {
+		stat = true
+	}
+
+	responseSuccess(c, stat)
 }
 
-// api/auth/login
-func loginAuth(c *gin.Context) {
+// api/login
+func verifyAuthKey(c *gin.Context) {
 	var payload struct {
 		Password string `json:"password" binding:"required"`
 	}
@@ -503,7 +570,7 @@ func loginAuth(c *gin.Context) {
 }
 
 // api/auth/change
-func changeAuth(c *gin.Context) {
+func changeAuthKey(c *gin.Context) {
 	var payload struct {
 		Password string `json:"password" binding:"required"`
 	}
@@ -568,8 +635,8 @@ func responseError(c *gin.Context, err error, code int, msg string) {
 	})
 }
 
-func coreCreate(obj core, data interface{}) error {
-	return obj.create(data)
+func coreCreate(obj core) error {
+	return obj.create()
 }
 
 func coreUpdate(obj core, data interface{}) error {
