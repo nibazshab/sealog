@@ -217,6 +217,7 @@ func TestTopic_stat(t *testing.T) {
 	}
 }
 
+// in go v1.26, use new(3), new(true)
 func ref[T any](x T) *T {
 	return &x
 }
